@@ -1,0 +1,179 @@
+/* ════════════════════════════════════════════════════════════ */
+/* DARK THEME (Default) */
+/* ════════════════════════════════════════════════════════════ */
+:root {
+    --bg:      #07080f;
+    --surface: #0d1117;
+    --card:    #111827;
+    --border:  #1e293b;
+    --accent:  #6366f1;
+    --teal:    #22d3ee;
+    --green:   #22c55e;
+    --amber:   #f59e0b;
+    --red:     #ef4444;
+    --text:    #e2e8f0;
+    --muted:   #64748b;
+    --radius:  14px;
+    --font:    'Syne', sans-serif;
+    --mono:    'JetBrains Mono', monospace;
+    --sidebar: 220px;
+    --right:   280px;
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/* LIGHT THEME */
+/* ════════════════════════════════════════════════════════════ */
+body.light-theme {
+    --bg:      #f8f9fa;
+    --surface: #ffffff;
+    --card:    #f3f4f6;
+    --border:  #e5e7eb;
+    --accent:  #4f46e5;
+    --teal:    #0891b2;
+    --green:   #16a34a;
+    --amber:   #d97706;
+    --red:     #dc2626;
+    --text:    #1f2937;
+    --muted:   #6b7280;
+}
+
+/* Adjust light theme specific styles */
+body.light-theme .sidebar {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-theme .topbar {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-theme .right-panel {
+    background: rgba(255, 255, 255, 0.95);
+}
+
+body.light-theme .search-wrap input::placeholder {
+    color: #9ca3af;
+}
+
+body.light-theme .logo-text {
+    background: linear-gradient(90deg, #4f46e5, #0891b2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+body.light-theme .welcome-banner {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.12) 0%, rgba(8, 145, 178, 0.08) 100%);
+    border: 1px solid rgba(79, 70, 229, 0.2);
+}
+
+body.light-theme .welcome-title {
+    background: linear-gradient(90deg, #1f2937, #4f46e5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+body.light-theme .help-box {
+    background: rgba(79, 70, 229, 0.06);
+    border: 1px solid rgba(79, 70, 229, 0.15);
+}
+
+body.light-theme .t-row:hover,
+body.light-theme .l-row:hover {
+    background: rgba(79, 70, 229, 0.05);
+}
+
+body.light-theme .reminder-item {
+    background: rgba(79, 70, 229, 0.05);
+    border: 1px solid rgba(79, 70, 229, 0.15);
+}
+
+body.light-theme .reminder-item:hover {
+    background: rgba(79, 70, 229, 0.1);
+    border-color: rgba(79, 70, 229, 0.3);
+}
+
+body.light-theme .cal-day:hover {
+    background: rgba(79, 70, 229, 0.1);
+}
+
+body.light-theme .logout {
+    background: rgba(220, 38, 38, 0.08);
+    border: 1px solid rgba(220, 38, 38, 0.2);
+    color: #dc2626;
+}
+
+body.light-theme .logout:hover {
+    background: rgba(220, 38, 38, 0.15);
+    border-color: rgba(220, 38, 38, 0.4);
+}
+
+body.light-theme .profile-btn {
+    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    box-shadow: 0 4px 16px rgba(79, 70, 229, 0.2);
+}
+
+body.light-theme .profile-btn:hover {
+    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+}
+
+/* Theme toggle button */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    font-size: 16px;
+    color: var(--text);
+    line-height: 1;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.theme-toggle:hover {
+    border-color: var(--accent);
+    background: rgba(99, 102, 241, 0.1);
+    color: var(--accent);
+    transform: scale(1.05);
+}
+
+.theme-toggle:active {
+    transform: scale(0.95);
+}
+
+.theme-toggle-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+/* For header buttons */
+.h-btn.theme-toggle {
+    padding: 8px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    min-width: 44px;
+}
+
+.h-btn.theme-toggle:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+/* Light theme adjustments */
+body.light-theme .theme-toggle {
+    background: rgba(79, 70, 229, 0.08);
+    border-color: rgba(79, 70, 229, 0.2);
+    color: var(--text);
+}
+
+body.light-theme .theme-toggle:hover {
+    background: rgba(79, 70, 229, 0.15);
+    border-color: rgba(79, 70, 229, 0.4);
+}
