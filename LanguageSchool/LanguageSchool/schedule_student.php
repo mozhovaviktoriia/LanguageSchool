@@ -8,14 +8,12 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
 
 $studentId = $_SESSION['user_id'];
 
-/* ── Дані студента ── */
 $stmtUser = $pdo->prepare("SELECT first_name, last_name, email, avatar_url FROM users WHERE id = :id");
 $stmtUser->execute(['id' => $studentId]);
 $me = $stmtUser->fetch(PDO::FETCH_ASSOC);
 $studentName = trim(($me['first_name'] ?? '') . ' ' . ($me['last_name'] ?? '')) ?: 'Студент';
 $initials = strtoupper(substr($me['first_name'] ?? '', 0, 1) . substr($me['last_name'] ?? '', 0, 1)) ?: 'СТ';
 
-/* ── Режим перегляду ── */
 $view        = in_array($_GET['view'] ?? '', ['week','month']) ? $_GET['view'] : 'week';
 $weekOffset  = (int)($_GET['week']  ?? 0);
 $monthOffset = (int)($_GET['month'] ?? 0);
@@ -23,14 +21,12 @@ $monthOffset = (int)($_GET['month'] ?? 0);
 $today    = new DateTime();
 $todayStr = $today->format('Y-m-d');
 
-/* ── Тижневий діапазон ── */
 $dow    = (int)$today->format('N');
 $monday = (clone $today)->modify('-' . ($dow - 1) . ' days')->modify($weekOffset . ' weeks');
 $sunday = (clone $monday)->modify('+6 days');
 $weekStart = $monday->format('Y-m-d');
 $weekEnd   = $sunday->format('Y-m-d');
 
-/* ── Місячний діапазон ── */
 $monthDt       = (clone $today)->modify($monthOffset . ' months');
 $monthYear     = (int)$monthDt->format('Y');
 $monthNum      = (int)$monthDt->format('m');
@@ -39,7 +35,6 @@ $monthEnd      = (clone $monthStart)->modify('last day of this month');
 $monthStartStr = $monthStart->format('Y-m-d');
 $monthEndStr   = $monthEnd->format('Y-m-d');
 
-/* ── Запит занять (без таблиці groups) ── */
 $rangeStart = $view === 'week' ? $weekStart : $monthStartStr;
 $rangeEnd   = $view === 'week' ? $weekEnd   : $monthEndStr;
 
@@ -66,7 +61,6 @@ $stmtLessons = $pdo->prepare("
 $stmtLessons->execute([':sid' => $studentId, ':ws' => $rangeStart, ':we' => $rangeEnd]);
 $lessons = $stmtLessons->fetchAll(PDO::FETCH_ASSOC);
 
-/* ── Кольори по курсах ── */
 $palette  = ['#6366f1','#22d3ee','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316'];
 $colorMap = [];
 foreach ($lessons as $l) {
@@ -74,7 +68,6 @@ foreach ($lessons as $l) {
         $colorMap[$l['course_id']] = $palette[count($colorMap) % count($palette)];
 }
 
-/* ── Групування по датах ── */
 $byDay    = [];
 $byDayIdx = array_fill(0, 7, []);
 foreach ($lessons as $l) {
@@ -87,13 +80,11 @@ foreach ($lessons as $l) {
     }
 }
 
-/* ── Статистика ── */
 $totalLessons  = count($lessons);
 $completedLess = 0;
 $upcomingLess  = count($lessons);
 $totalMin      = count($lessons) * 60;
 
-/* ── Діапазон годин ── */
 $minHour = 8; $maxHour = 21; $pxPerHour = 64;
 if ($view === 'week' && $lessons) {
     $sh = array_map(fn($l) => (int)(new DateTime($l['scheduled_at']))->format('H'), $lessons);
@@ -105,13 +96,11 @@ if ($view === 'week' && $lessons) {
 }
 $totalPx = ($maxHour - $minHour) * $pxPerHour;
 
-/* ── Кількість курсів ── */
 $allCoursesCount = $pdo->query("SELECT COUNT(*) FROM courses WHERE is_active = TRUE")->fetchColumn();
 
 $UA_MONTHS = ['','Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
 $UA_DAYS   = ['Пн','Вт','Ср','Чт','Пт','Сб','Нд'];
 
-/* ── Хелпер: encode lesson data for JS ── */
 function lessonJson(array $l, array $colorMap): string {
     $dt  = new DateTime($l['scheduled_at']);
     $dur = 60;
@@ -139,49 +128,73 @@ function lessonJson(array $l, array $colorMap): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Розклад — LinguaHub</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="theme.css" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
-:root {
-    --bg:#07080f; --surface:#0d1117; --card:#111827; --border:#1e293b;
-    --accent:#6366f1; --teal:#22d3ee; --green:#22c55e; --amber:#f59e0b;
-    --red:#ef4444; --text:#e2e8f0; --muted:#64748b;
-    --font:'Syne',sans-serif; --mono:'JetBrains Mono',monospace;
-    --sidebar:230px;
+
+html, body { height:100%; }
+body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    overflow: hidden;
+    transition: background .25s, color .25s;
 }
-html,body { height:100%; }
-body { font-family:var(--font); background:var(--bg); color:var(--text); display:flex; overflow:hidden; }
-body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-    background: radial-gradient(ellipse 80% 50% at 5% 0%,rgba(99,102,241,.13) 0%,transparent 55%),
-                radial-gradient(ellipse 55% 40% at 95% 90%,rgba(34,211,238,.09) 0%,transparent 55%); }
+
+body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+        radial-gradient(ellipse 80% 50% at 5% 0%,  var(--glow-1) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 40% at 95% 90%, var(--glow-2) 0%, transparent 55%);
+}
 
 /* ══ SIDEBAR ══ */
-.sidebar { position:fixed; top:0; left:0; bottom:0; width:var(--sidebar);
-    background:rgba(13,17,23,.97); border-right:1px solid var(--border);
-    display:flex; flex-direction:column; z-index:20; }
+.sidebar {
+    position:fixed; top:0; left:0; bottom:0; width:var(--sidebar);
+    background: var(--sidebar-bg);
+    border-right:1px solid var(--border);
+    display:flex; flex-direction:column; z-index:20;
+    transition: background .25s, border-color .25s;
+}
 .sidebar-logo { padding:22px 20px 18px; border-bottom:1px solid var(--border); }
-.logo-text { font-size:20px; font-weight:800; letter-spacing:-.5px; }
+.logo-text { font-size:20px; font-weight:800; letter-spacing:-.5px; color: var(--text); }
 .logo-text span { color:var(--teal); }
-.sidebar-profile { display:flex; align-items:center; gap:11px; padding:14px 20px; border-bottom:1px solid var(--border); }
-.s-avatar { width:38px; height:38px; border-radius:50%; background:linear-gradient(135deg,var(--accent),var(--teal));
-    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px;
-    color:#fff; flex-shrink:0; border:2px solid rgba(99,102,241,.4); overflow:hidden; }
+.sidebar-profile {
+    display:flex; align-items:center; gap:11px;
+    padding:14px 20px; border-bottom:1px solid var(--border);
+}
+.s-avatar {
+    width:38px; height:38px; border-radius:50%;
+    background:linear-gradient(135deg,var(--accent),var(--teal));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:13px; color:#fff;
+    flex-shrink:0; border:2px solid rgba(99,102,241,.4); overflow:hidden;
+}
 .s-avatar img { width:100%; height:100%; object-fit:cover; }
-.profile-name { font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px; }
+.profile-name { font-size:13px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px; }
 .profile-role { font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+
 .sidebar-nav { flex:1; padding:12px 10px; display:flex; flex-direction:column; gap:2px; overflow-y:auto; }
 .nav-label { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; padding:10px 10px 4px; margin-top:4px; }
-.nav-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px;
-    text-decoration:none; color:var(--muted); font-size:13px; font-weight:600; transition:.18s; border:1px solid transparent; }
+.nav-item {
+    display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px;
+    text-decoration:none; color:var(--muted); font-size:13px; font-weight:600;
+    transition:.18s; border:1px solid transparent;
+}
 .nav-item svg { width:15px; height:15px; flex-shrink:0; }
-.nav-item:hover { color:var(--text); background:rgba(255,255,255,.04); }
-.nav-item.active { color:#fff; background:rgba(99,102,241,.15); border-color:rgba(99,102,241,.3); }
-.nav-badge { margin-left:auto; font-family:var(--mono); font-size:9px; font-weight:700; padding:2px 7px; border-radius:99px; background:rgba(99,102,241,.25); color:#a5b4fc; }
-.nav-badge.green { background:rgba(34,197,94,.2); color:var(--green); }
-.nav-badge.amber { background:rgba(245,158,11,.2); color:var(--amber); }
+.nav-item:hover { color:var(--text); background:var(--hover-nav); }
+.nav-item.active { color:var(--accent); background:rgba(99,102,241,.13); border-color:rgba(99,102,241,.3); }
+.nav-badge { margin-left:auto; font-family:var(--mono); font-size:9px; font-weight:700; padding:2px 7px; border-radius:99px; background:rgba(99,102,241,.2); color:var(--accent); }
+.nav-badge.green { background:rgba(34,197,94,.15); color:var(--green); }
+.nav-badge.amber { background:rgba(245,158,11,.15); color:var(--amber); }
+
 .sidebar-footer { padding:12px 10px; border-top:1px solid var(--border); }
-.logout-btn { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:10px;
-    background:rgba(239,68,68,.07); border:1px solid rgba(239,68,68,.2); color:#fca5a5;
-    font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer; transition:.18s; text-decoration:none; }
+.logout-btn {
+    display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border-radius:10px;
+    background:rgba(239,68,68,.07); border:1px solid rgba(239,68,68,.2); color:var(--red);
+    font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer; transition:.18s; text-decoration:none;
+}
 .logout-btn:hover { background:rgba(239,68,68,.15); border-color:rgba(239,68,68,.4); }
 .logout-btn svg { width:14px; height:14px; }
 
@@ -189,50 +202,68 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 .main { margin-left:var(--sidebar); flex:1; display:flex; flex-direction:column; height:100vh; overflow:hidden; position:relative; z-index:1; }
 
 /* ══ TOPBAR ══ */
-.topbar { flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+.topbar {
+    flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
     padding:11px 22px; border-bottom:1px solid var(--border);
-    background:rgba(7,8,15,.92); backdrop-filter:blur(20px); gap:12px; }
+    background: var(--topbar-bg); backdrop-filter:blur(20px); gap:12px;
+    transition: background .25s, border-color .25s;
+}
 .topbar-left  { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .topbar-right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
-.page-title   { font-size:16px; font-weight:800; letter-spacing:-.3px; white-space:nowrap; }
+.page-title   { font-size:16px; font-weight:800; letter-spacing:-.3px; white-space:nowrap; color:var(--text); }
 .page-title span { color:var(--teal); }
+
 .nav-group  { display:flex; align-items:center; gap:4px; }
-.nav-arrow  { width:28px; height:28px; border-radius:7px; border:1px solid var(--border);
-    background:var(--surface); color:var(--muted); cursor:pointer; display:flex;
-    align-items:center; justify-content:center; transition:.18s; font-size:12px; text-decoration:none; }
+.nav-arrow  {
+    width:28px; height:28px; border-radius:7px; border:1px solid var(--border);
+    background:var(--surface); color:var(--muted); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:.18s; font-size:12px; text-decoration:none;
+}
 .nav-arrow:hover { color:var(--text); border-color:rgba(99,102,241,.4); background:rgba(99,102,241,.08); }
-.range-label { font-family:var(--mono); font-size:10px; color:var(--text); white-space:nowrap;
-    padding:0 8px; min-width:180px; text-align:center; }
-.today-btn { padding:5px 11px; border-radius:7px; border:1px solid rgba(99,102,241,.3);
-    background:rgba(99,102,241,.1); color:#a5b4fc; font-family:var(--mono);
-    font-size:10px; font-weight:600; cursor:pointer; transition:.18s; text-decoration:none; white-space:nowrap; }
-.today-btn:hover { background:rgba(99,102,241,.2); }
+.range-label {
+    font-family:var(--mono); font-size:10px; color:var(--text); white-space:nowrap;
+    padding:0 8px; min-width:180px; text-align:center;
+}
+.today-btn {
+    padding:5px 11px; border-radius:7px; border:1px solid rgba(99,102,241,.3);
+    background:rgba(99,102,241,.10); color:var(--accent); font-family:var(--mono);
+    font-size:10px; font-weight:600; cursor:pointer; transition:.18s; text-decoration:none; white-space:nowrap;
+}
+.today-btn:hover { background:rgba(99,102,241,.18); }
+
 .view-toggle { display:flex; background:var(--surface); border:1px solid var(--border); border-radius:9px; overflow:hidden; }
-.vt-btn { padding:6px 13px; font-family:var(--mono); font-size:10px; font-weight:600;
+.vt-btn {
+    padding:6px 13px; font-family:var(--mono); font-size:10px; font-weight:600;
     color:var(--muted); border:none; background:none; cursor:pointer; transition:.18s;
-    display:flex; align-items:center; gap:5px; text-decoration:none; white-space:nowrap; }
+    display:flex; align-items:center; gap:5px; text-decoration:none; white-space:nowrap;
+}
 .vt-btn:hover { color:var(--text); }
-.vt-btn.active { background:rgba(99,102,241,.18); color:#a5b4fc; }
+.vt-btn.active { background:rgba(99,102,241,.18); color:var(--accent); }
 
 /* ══ STATS STRIP ══ */
 .stats-strip { flex-shrink:0; display:flex; gap:1px; border-bottom:1px solid var(--border); background:var(--border); }
-.stat-chip { flex:1; padding:8px 14px; background:var(--surface); display:flex; align-items:center; gap:8px; }
+.stat-chip { flex:1; padding:8px 14px; background:var(--surface); display:flex; align-items:center; gap:8px; transition: background .25s; }
 .stat-chip-icon { font-size:14px; }
 .stat-chip-val  { font-size:15px; font-weight:800; }
 .stat-chip-lbl  { font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-top:1px; }
-.c-purple .stat-chip-val { color:#a5b4fc; }
+.c-purple .stat-chip-val { color:var(--accent); }
 .c-teal   .stat-chip-val { color:var(--teal); }
 .c-green  .stat-chip-val { color:var(--green); }
 .c-amber  .stat-chip-val { color:var(--amber); }
 
 /* ══ WEEK VIEW ══ */
 .cal-wrap  { flex:1; overflow:hidden; display:flex; flex-direction:column; }
-.cal-header { flex-shrink:0; display:flex; border-bottom:1px solid var(--border); background:rgba(13,17,23,.95); }
+.cal-header {
+    flex-shrink:0; display:flex; border-bottom:1px solid var(--border);
+    background: var(--panel-bg);
+    transition: background .25s;
+}
 .time-gutter { width:50px; flex-shrink:0; border-right:1px solid var(--border); }
 .cal-day-hd { flex:1; min-width:0; padding:8px 4px; text-align:center; border-right:1px solid var(--border); }
 .cal-day-hd:last-child { border-right:none; }
 .cal-day-name { font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
-.cal-day-num  { font-size:17px; font-weight:800; margin-top:1px; line-height:1; }
+.cal-day-num  { font-size:17px; font-weight:800; margin-top:1px; line-height:1; color:var(--text); }
 .cal-day-hd.is-today .cal-day-num  { color:var(--accent); }
 .cal-day-hd.is-today .cal-day-name { color:var(--accent); }
 .cal-day-hd.has-ev .cal-day-name::after { content:'·'; color:var(--teal); margin-left:2px; font-size:14px; vertical-align:middle; }
@@ -246,22 +277,21 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 .days-grid { flex:1; display:grid; grid-template-columns:repeat(7,1fr); position:relative; }
 .day-col   { border-right:1px solid var(--border); position:relative; }
 .day-col:last-child { border-right:none; }
-.hr-line   { position:absolute; left:0; right:0; border-top:1px solid rgba(30,41,59,.5); pointer-events:none; }
-.hf-line   { position:absolute; left:0; right:0; border-top:1px dashed rgba(30,41,59,.28); pointer-events:none; }
+.hr-line   { position:absolute; left:0; right:0; border-top:1px solid var(--border); pointer-events:none; }
+.hf-line   { position:absolute; left:0; right:0; border-top:1px dashed var(--border); opacity:.5; pointer-events:none; }
 .now-line  { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--red),rgba(239,68,68,.2)); z-index:5; pointer-events:none; }
 .now-dot   { position:absolute; left:-4px; top:-4px; width:9px; height:9px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); }
 
-.lb { position:absolute; left:2px; right:2px; border-radius:8px; padding:5px 7px; overflow:hidden;
+.lb {
+    position:absolute; left:2px; right:2px; border-radius:8px; padding:5px 7px; overflow:hidden;
     cursor:pointer; transition:transform .13s,box-shadow .13s; display:flex; flex-direction:column;
-    z-index:2; border-left-width:3px; border-left-style:solid; }
-.lb:hover { transform:scale(1.03) translateY(-1px); z-index:10; box-shadow:0 6px 22px rgba(0,0,0,.55); }
-.lb-lang    { font-family:var(--mono); font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
-.lb-title   { font-size:11px; font-weight:700; line-height:1.3; margin-top:1px; color:#e2e8f0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.lb-sub     { font-family:var(--mono); font-size:9px; opacity:.65; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.lb-time    { font-family:var(--mono); font-size:8px; opacity:.7; margin-top:auto; padding-top:3px; }
-.lb-tick    { position:absolute; top:5px; right:6px; font-size:10px; opacity:.8; }
-.lb.done   { opacity:.65; }
-.lb.canc   { opacity:.4; }
+    z-index:2; border-left-width:3px; border-left-style:solid;
+}
+.lb:hover { transform:scale(1.03) translateY(-1px); z-index:10; box-shadow:0 6px 22px rgba(0,0,0,.3); }
+.lb-lang  { font-family:var(--mono); font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+.lb-title { font-size:11px; font-weight:700; line-height:1.3; margin-top:1px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lb-sub   { font-family:var(--mono); font-size:9px; opacity:.65; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lb-time  { font-family:var(--mono); font-size:8px; opacity:.7; margin-top:auto; padding-top:3px; }
 
 /* ══ MONTH VIEW ══ */
 .month-wrap { flex:1; overflow-y:auto; padding:14px 18px 20px; }
@@ -270,54 +300,75 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 .month-grid-hd { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:5px; }
 .month-dh { text-align:center; font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; padding:3px 0; }
 .month-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
-.month-cell { min-height:92px; background:var(--card); border:1px solid var(--border);
-    border-radius:10px; padding:6px; display:flex; flex-direction:column; gap:3px; transition:border-color .18s; }
-.month-cell:hover { border-color:rgba(99,102,241,.3); }
+.month-cell {
+    min-height:92px; background:var(--card); border:1px solid var(--border);
+    border-radius:10px; padding:6px; display:flex; flex-direction:column; gap:3px;
+    transition:border-color .18s, background .25s;
+}
+.month-cell:hover { border-color:rgba(99,102,241,.35); }
 .month-cell.other-month { opacity:.28; pointer-events:none; }
 .month-cell.is-today { border-color:rgba(99,102,241,.5); background:rgba(99,102,241,.06); }
-.cell-num { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--muted);
+.cell-num {
+    font-family:var(--mono); font-size:10px; font-weight:700; color:var(--muted);
     align-self:flex-start; width:22px; height:22px; display:flex; align-items:center;
-    justify-content:center; border-radius:6px; flex-shrink:0; }
+    justify-content:center; border-radius:6px; flex-shrink:0;
+}
 .month-cell.is-today .cell-num { background:var(--accent); color:#fff; }
-.month-ev { font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px;
+.month-ev {
+    font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
-    transition:.12s; line-height:1.45; border-left-width:2px; border-left-style:solid; }
-.month-ev:hover { filter:brightness(1.25); transform:scale(1.02); }
+    transition:.12s; line-height:1.45; border-left-width:2px; border-left-style:solid;
+}
+.month-ev:hover { filter:brightness(1.2); transform:scale(1.02); }
 .month-more { font-family:var(--mono); font-size:9px; color:var(--muted); padding:1px 4px; cursor:pointer; transition:.14s; }
 .month-more:hover { color:var(--text); }
 
 /* ══ POPUP ══ */
-.popup { display:none; position:fixed; z-index:300; width:272px; background:var(--card);
-    border:1px solid var(--border); border-radius:14px; padding:15px;
-    box-shadow:0 20px 50px rgba(0,0,0,.65); animation:popIn .16s ease both; }
+.popup {
+    display:none; position:fixed; z-index:300; width:272px;
+    background:var(--card); border:1px solid var(--border);
+    border-radius:14px; padding:15px;
+    box-shadow:0 20px 50px rgba(0,0,0,.35);
+    animation:popIn .16s ease both;
+    transition: background .25s, border-color .25s;
+}
 .popup.show { display:block; }
-.pop-bar    { height:3px; border-radius:99px; margin-bottom:11px; }
-.pop-head   { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:9px; }
-.pop-title  { font-size:13px; font-weight:800; line-height:1.35; flex:1; margin-right:8px; }
-.pop-x      { background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px; line-height:1; padding:2px 4px; transition:.13s; flex-shrink:0; }
+.pop-bar   { height:3px; border-radius:99px; margin-bottom:11px; }
+.pop-head  { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:9px; }
+.pop-title { font-size:13px; font-weight:800; line-height:1.35; flex:1; margin-right:8px; color:var(--text); }
+.pop-x     { background:none; border:none; color:var(--muted); cursor:pointer; font-size:15px; line-height:1; padding:2px 4px; transition:.13s; flex-shrink:0; }
 .pop-x:hover { color:var(--text); }
-.pop-row    { display:flex; align-items:center; gap:6px; margin-bottom:5px; font-family:var(--mono); font-size:10px; color:var(--muted); }
+.pop-row   { display:flex; align-items:center; gap:6px; margin-bottom:5px; font-family:var(--mono); font-size:10px; color:var(--muted); }
 .pop-row svg { width:11px; height:11px; flex-shrink:0; }
 .pop-row span { color:var(--text); }
-.pop-badge  { display:inline-flex; padding:3px 9px; border-radius:99px; font-family:var(--mono); font-size:9px; font-weight:700; margin-top:5px; }
-.pop-badge.scheduled { background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.3); }
+.pop-badge { display:inline-flex; padding:3px 9px; border-radius:99px; font-family:var(--mono); font-size:9px; font-weight:700; margin-top:5px; }
+.pop-badge.scheduled { background:rgba(99,102,241,.15); color:var(--accent); border:1px solid rgba(99,102,241,.3); }
 .pop-badge.completed { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.3); }
-.pop-badge.cancelled { background:rgba(239,68,68,.1); color:#fca5a5; border:1px solid rgba(239,68,68,.25); }
+.pop-badge.cancelled { background:rgba(239,68,68,.10); color:var(--red); border:1px solid rgba(239,68,68,.25); }
 .pop-actions { margin-top:10px; display:flex; gap:6px; }
-.pop-btn { flex:1; padding:7px; border-radius:8px; font-family:var(--font); font-size:11px;
+.pop-btn {
+    flex:1; padding:7px; border-radius:8px; font-family:var(--font); font-size:11px;
     font-weight:700; cursor:pointer; transition:.14s; text-align:center; text-decoration:none;
-    display:flex; align-items:center; justify-content:center; gap:4px; border:none; }
-.pop-join   { background:linear-gradient(135deg,var(--accent),#818cf8); color:#fff; }
+    display:flex; align-items:center; justify-content:center; gap:4px; border:none;
+}
+.pop-join { background:linear-gradient(135deg,var(--accent),#818cf8); color:#fff; }
 .pop-join:hover { opacity:.85; }
-.pop-close-btn { background:rgba(255,255,255,.05); color:var(--muted); border:1px solid var(--border) !important; }
+.pop-close-btn { background:var(--input-bg); color:var(--muted); border:1px solid var(--border) !important; }
 .pop-close-btn:hover { color:var(--text); border-color:rgba(99,102,241,.3) !important; }
 
 /* ══ EMPTY ══ */
-.empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center;
-    flex:1; gap:10px; padding:50px 24px; text-align:center; opacity:.5; }
+.empty-state {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    flex:1; gap:10px; padding:50px 24px; text-align:center; opacity:.5;
+}
 .empty-icon  { font-size:44px; }
 .empty-title { font-size:14px; font-weight:800; color:var(--muted); }
 .empty-sub   { font-family:var(--mono); font-size:10px; color:var(--muted); line-height:1.7; max-width:240px; }
+
+/* ══ LIGHT THEME specifics for this page ══ */
+body.light-theme .lb-title { color: #1e293b; }
+body.light-theme .lb:hover { box-shadow: 0 6px 22px rgba(0,0,0,.12); }
+body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
 
 @keyframes popIn { from{opacity:0;transform:scale(.93) translateY(4px)} to{opacity:1;transform:none} }
 </style>
@@ -358,7 +409,7 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         <a class="nav-item" href="dashboard_student.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Дашборд
         </a>
-        <a class="nav-item" href="courses.php">
+        <a class="nav-item" href="courses_catalog.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>Всі курси
             <span class="nav-badge"><?= $allCoursesCount ?></span>
         </a>
@@ -385,6 +436,9 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         </a>
     </nav>
     <div class="sidebar-footer">
+        <button class="theme-toggle" title="Змінити тему" style="width:100%;margin-bottom:8px;padding:8px;display:flex;align-items:center;justify-content:center">
+            <span class="theme-toggle-icon">☀️</span>
+        </button>
         <a class="logout-btn" href="logout.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Вийти
         </a>
@@ -393,8 +447,6 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 
 <!-- MAIN -->
 <main class="main">
-
-    <!-- TOPBAR -->
     <div class="topbar">
         <div class="topbar-left">
             <div class="page-title">📅 <span>РОЗКЛАД</span></div>
@@ -435,7 +487,6 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         </div>
     </div>
 
-    <!-- STATS -->
     <div class="stats-strip">
         <div class="stat-chip c-purple">
             <span class="stat-chip-icon">📚</span>
@@ -458,7 +509,6 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
     </div>
 
     <?php if ($view === 'week'): ?>
-    <!-- ═══════════════ WEEK VIEW ═══════════════ -->
     <div class="cal-wrap">
         <div class="cal-header">
             <div class="time-gutter"></div>
@@ -530,12 +580,10 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
     </div>
 
     <?php else: ?>
-    <!-- ═══════════════ MONTH VIEW ═══════════════ -->
     <div class="month-wrap">
         <div class="month-grid-hd">
             <?php foreach ($UA_DAYS as $d): ?><div class="month-dh"><?= $d ?></div><?php endforeach; ?>
         </div>
-
         <?php
         $firstDow    = (int)$monthStart->format('N') - 1;
         $daysInMonth = (int)$monthEnd->format('j');
@@ -559,14 +607,13 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
                 $cellDt  = new DateTime("$monthYear-$monthNum-$cellDay");
                 $otherMo = false;
             }
-            $cellStr     = $cellDt->format('Y-m-d');
-            $isToday     = $cellStr === $todayStr;
-            $dayLessons  = $byDay[$cellStr] ?? [];
+            $cellStr    = $cellDt->format('Y-m-d');
+            $isToday    = $cellStr === $todayStr;
+            $dayLessons = $byDay[$cellStr] ?? [];
         ?>
         <div class="month-cell<?= $otherMo?' other-month':'' ?><?= $isToday?' is-today':'' ?>">
             <div class="cell-num"><?= $cellDay ?></div>
-            <?php
-            $shown = 0;
+            <?php $shown = 0;
             foreach ($dayLessons as $l):
                 if ($shown >= 3) break; $shown++;
                 $col = $colorMap[$l['course_id']] ?? '#6366f1';
@@ -595,7 +642,6 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         <?php endif; ?>
     </div>
     <?php endif; ?>
-
 </main>
 
 <script>
@@ -603,23 +649,20 @@ const popup = document.getElementById('popup');
 
 function showPopup(e, data) {
     e.stopPropagation();
-    document.getElementById('popBar').style.background = data.color;
-    document.getElementById('popTitle').textContent    = data.title;
-    document.getElementById('popDate').innerHTML       = `<span>${data.date}</span>`;
-    document.getElementById('popTime').innerHTML       = `<span>${data.start} — ${data.end} (${data.dur} хв)</span>`;
-    document.getElementById('popCourse').innerHTML     = `<span>${data.course}</span>`;
-    document.getElementById('popTeacher').innerHTML    = `<span>${data.teacher}</span>`;
-
+    document.getElementById('popBar').style.background    = data.color;
+    document.getElementById('popTitle').textContent       = data.title;
+    document.getElementById('popDate').innerHTML          = `<span>${data.date}</span>`;
+    document.getElementById('popTime').innerHTML          = `<span>${data.start} — ${data.end} (${data.dur} хв)</span>`;
+    document.getElementById('popCourse').innerHTML        = `<span>${data.course}</span>`;
+    document.getElementById('popTeacher').innerHTML       = `<span>${data.teacher}</span>`;
     const sb = document.getElementById('popStatus');
     const labels = {scheduled:'Заплановано', completed:'Завершено', cancelled:'Скасовано'};
     sb.textContent = labels[data.status] || data.status;
     sb.className   = 'pop-badge ' + (data.status || 'scheduled');
-
     const acts = document.getElementById('popActions');
     acts.innerHTML = (data.url && data.status === 'scheduled')
         ? `<a class="pop-btn pop-join" href="${data.url}" target="_blank">📹 Приєднатись</a>` : '';
     acts.innerHTML += `<button class="pop-btn pop-close-btn" onclick="closePopup()">Закрити</button>`;
-
     const vw=window.innerWidth, vh=window.innerHeight, pw=280, ph=310;
     let x=e.clientX+14, y=e.clientY-20;
     if (x+pw>vw-10) x=e.clientX-pw-14;
@@ -641,5 +684,6 @@ document.addEventListener('DOMContentLoaded', () => {
         : Math.max(0, (9 - <?= $minHour ?>) * <?= $pxPerHour ?> - 40);
 });
 </script>
+<script src="theme-switcher.js"></script>
 </body>
 </html>

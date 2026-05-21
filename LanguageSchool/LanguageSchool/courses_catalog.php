@@ -86,29 +86,6 @@ foreach ($filteredCourses as $course) {
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
-    --bg:       #07080f;
-    --surface:  #0d1117;
-    --card:     #0f1520;
-    --card-hover: #131d2e;
-    --border:   rgba(255,255,255,.07);
-    --border-hover: rgba(99,102,241,.45);
-    --accent:   #6366f1;
-    --accent2:  #818cf8;
-    --teal:     #22d3ee;
-    --green:    #34d399;
-    --amber:    #fbbf24;
-    --red:      #f87171;
-    --text:     #f1f5f9;
-    --sub:      #94a3b8;
-    --muted:    #475569;
-    --font:     'Syne', sans-serif;
-    --mono:     'JetBrains Mono', monospace;
-    --sidebar-w: 240px;
-    --topbar-h:  60px;
-    --radius:   12px;
-}
-
 html, body { height: 100%; }
 body {
     font-family: var(--font);
@@ -118,34 +95,34 @@ body {
     overflow-x: hidden;
     font-size: 14px;
     line-height: 1.5;
+    transition: background .25s, color .25s;
 }
 
-/* ─── Ambient background ─── */
+/* ── Ambient background ── */
 body::before {
     content: '';
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
     background:
-        radial-gradient(ellipse 70% 55% at 8% 2%,  rgba(99,102,241,.10) 0%, transparent 60%),
-        radial-gradient(ellipse 55% 55% at 92% 92%, rgba(34,211,238,.08) 0%, transparent 60%);
+        radial-gradient(ellipse 70% 55% at 8% 2%,  var(--glow-1) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 55% at 92% 92%, var(--glow-2) 0%, transparent 60%);
 }
 
-/* ══════════════════════════════
-   SIDEBAR
-══════════════════════════════ */
+/* ══ SIDEBAR ══ */
 .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0;
-    width: var(--sidebar-w);
-    background: rgba(10,13,20,.98);
+    width: 240px;
+    background: var(--sidebar-bg);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
     z-index: 30;
+    transition: background .25s, border-color .25s;
 }
 
 .sidebar-logo {
     padding: 20px 20px 16px;
     border-bottom: 1px solid var(--border);
 }
-.logo-text { font-size: 19px; font-weight: 800; letter-spacing: -.5px; }
+.logo-text { font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text); }
 .logo-text span { color: var(--teal); }
 
 .sidebar-profile {
@@ -162,20 +139,17 @@ body::before {
 }
 .s-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .profile-name {
-    font-size: 13px; font-weight: 700;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    max-width: 148px;
+    font-size: 13px; font-weight: 700; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 148px;
 }
 .profile-role {
     font-family: var(--mono); font-size: 9px;
-    color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px;
-    margin-top: 2px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 2px;
 }
 
 .sidebar-nav {
-    flex: 1; padding: 10px 10px;
-    display: flex; flex-direction: column; gap: 1px;
-    overflow-y: auto;
+    flex: 1; padding: 10px;
+    display: flex; flex-direction: column; gap: 1px; overflow-y: auto;
 }
 .nav-label {
     font-family: var(--mono); font-size: 9px;
@@ -185,55 +159,51 @@ body::before {
 .nav-item {
     display: flex; align-items: center; gap: 9px;
     padding: 9px 11px; border-radius: 9px;
-    text-decoration: none; color: var(--sub);
+    text-decoration: none; color: var(--muted);
     font-size: 13px; font-weight: 600;
     transition: background .15s, color .15s;
     border: 1px solid transparent;
 }
 .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .75; }
-.nav-item:hover { color: var(--text); background: rgba(255,255,255,.05); }
+.nav-item:hover { color: var(--text); background: var(--hover-nav); }
 .nav-item.active {
-    color: #fff; background: rgba(99,102,241,.15);
+    color: var(--accent); background: rgba(99,102,241,.13);
     border-color: rgba(99,102,241,.28);
 }
 .nav-item.active svg { opacity: 1; }
 
-.sidebar-footer { padding: 10px 10px; border-top: 1px solid var(--border); }
+.sidebar-footer { padding: 10px; border-top: 1px solid var(--border); }
 .logout-btn {
     display: flex; align-items: center; gap: 9px;
     width: 100%; padding: 9px 11px; border-radius: 9px;
     background: rgba(239,68,68,.06); border: 1px solid rgba(239,68,68,.18);
-    color: #fca5a5; font-family: var(--font); font-size: 13px; font-weight: 600;
+    color: var(--red); font-family: var(--font); font-size: 13px; font-weight: 600;
     cursor: pointer; transition: .15s; text-decoration: none;
 }
 .logout-btn svg { width: 15px; height: 15px; }
 .logout-btn:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.35); }
 
-/* ══════════════════════════════
-   MAIN LAYOUT
-══════════════════════════════ */
+/* ══ MAIN ══ */
 .main {
-    margin-left: var(--sidebar-w);
+    margin-left: 240px;
     flex: 1; display: flex; flex-direction: column;
     min-height: 100vh; position: relative; z-index: 1;
 }
 
-/* ══════════════════════════════
-   TOPBAR
-══════════════════════════════ */
+/* ══ TOPBAR ══ */
 .topbar {
     position: sticky; top: 0; z-index: 20;
-    height: var(--topbar-h);
+    height: 60px;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 28px; gap: 16px;
-    background: rgba(7,8,15,.90); backdrop-filter: blur(18px);
+    background: var(--topbar-bg); backdrop-filter: blur(18px);
     border-bottom: 1px solid var(--border);
+    transition: background .25s, border-color .25s;
 }
 .page-title {
     font-size: 15px; font-weight: 800; letter-spacing: -.2px;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 8px; color: var(--text);
 }
-.page-title-icon { font-size: 18px; line-height: 1; }
 
 .topbar-controls { display: flex; align-items: center; gap: 10px; }
 
@@ -241,14 +211,13 @@ body::before {
     display: flex; align-items: center; gap: 8px;
     background: var(--card); border: 1px solid var(--border);
     border-radius: 9px; padding: 0 12px; height: 36px;
-    transition: border-color .15s;
+    transition: border-color .15s, background .25s;
 }
 .search-box:focus-within { border-color: rgba(99,102,241,.5); }
 .search-box svg { flex-shrink: 0; color: var(--muted); }
 .search-box input {
     background: none; border: none; outline: none;
-    color: var(--text); font-family: var(--font); font-size: 13px;
-    width: 190px;
+    color: var(--text); font-family: var(--font); font-size: 13px; width: 190px;
 }
 .search-box input::placeholder { color: var(--muted); }
 
@@ -257,30 +226,22 @@ body::before {
     background: var(--card); border: 1px solid var(--border);
     border-radius: 9px; color: var(--text);
     font-family: var(--font); font-size: 13px; cursor: pointer;
-    transition: border-color .15s; outline: none;
+    transition: border-color .15s, background .25s; outline: none;
 }
-.filter-select:focus,
-.filter-select:hover { border-color: rgba(99,102,241,.4); }
-.filter-select option { background: #0d1117; }
+.filter-select:focus, .filter-select:hover { border-color: rgba(99,102,241,.4); }
 
-/* ══════════════════════════════
-   CONTENT
-══════════════════════════════ */
+/* ══ CONTENT ══ */
 .content { padding: 24px 28px; flex: 1; }
 
-/* ── Language section ── */
 .lang-section { margin-bottom: 36px; }
 .lang-heading {
     display: flex; align-items: center; gap: 10px;
     font-size: 13px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.5px; color: var(--sub);
-    font-family: var(--mono);
-    margin-bottom: 14px;
+    letter-spacing: 1.5px; color: var(--muted);
+    font-family: var(--mono); margin-bottom: 14px;
 }
 .lang-heading::after {
-    content: '';
-    flex: 1; height: 1px;
-    background: var(--border);
+    content: ''; flex: 1; height: 1px; background: var(--border);
 }
 .lang-dot {
     width: 6px; height: 6px; border-radius: 50%;
@@ -288,7 +249,6 @@ body::before {
     box-shadow: 0 0 8px var(--teal);
 }
 
-/* ── Courses grid ── */
 .courses-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -299,77 +259,54 @@ body::before {
 .course-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: 12px;
     padding: 18px;
     display: flex; flex-direction: column; gap: 14px;
-    transition: border-color .2s, transform .2s, box-shadow .2s;
+    transition: border-color .2s, transform .2s, box-shadow .2s, background .25s;
     position: relative; overflow: hidden;
 }
-.course-card::after {
-    content: '';
-    position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(135deg, rgba(99,102,241,.04) 0%, transparent 60%);
-    opacity: 0; transition: opacity .2s;
-}
 .course-card:hover {
-    border-color: var(--border-hover);
+    border-color: rgba(99,102,241,.45);
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(99,102,241,.15);
-    background: var(--card-hover);
+    box-shadow: 0 8px 24px rgba(99,102,241,.12);
 }
-.course-card:hover::after { opacity: 1; }
 
-/* Card top row */
 .card-top {
     display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
 }
 .lang-badge {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
-    color: var(--accent2); background: rgba(99,102,241,.12);
+    color: var(--accent); background: rgba(99,102,241,.10);
     padding: 3px 9px; border-radius: 6px; letter-spacing: .3px;
-    border: 1px solid rgba(99,102,241,.2);
-    white-space: nowrap;
+    border: 1px solid rgba(99,102,241,.22); white-space: nowrap;
 }
 .enrolled-chip {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
-    color: var(--green); background: rgba(52,211,153,.1);
+    color: var(--green); background: rgba(34,197,94,.10);
     padding: 3px 9px; border-radius: 6px; letter-spacing: .3px;
-    border: 1px solid rgba(52,211,153,.2);
-    white-space: nowrap;
+    border: 1px solid rgba(34,197,94,.22); white-space: nowrap;
 }
 
-/* Card body */
 .card-body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .course-title {
-    font-size: 15px; font-weight: 800; line-height: 1.3;
-    color: var(--text);
+    font-size: 15px; font-weight: 800; line-height: 1.3; color: var(--text);
 }
 .course-desc {
-    font-size: 12px; color: var(--sub); line-height: 1.55;
+    font-size: 12px; color: var(--muted); line-height: 1.55;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-/* Tags */
 .card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .tag {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
-    padding: 3px 9px; border-radius: 6px;
-    border: 1px solid transparent;
+    padding: 3px 9px; border-radius: 6px; border: 1px solid transparent;
 }
-.tag-level {
-    color: var(--amber); background: rgba(251,191,36,.08);
-    border-color: rgba(251,191,36,.18);
-}
-.tag-price {
-    color: var(--green); background: rgba(52,211,153,.08);
-    border-color: rgba(52,211,153,.18);
-}
+.tag-level  { color: var(--amber); background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.22); }
+.tag-price  { color: var(--green); background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.22); }
 
-/* Teacher row */
 .teacher-row {
     display: flex; align-items: center; gap: 10px;
-    padding-top: 12px;
-    border-top: 1px solid var(--border);
+    padding-top: 12px; border-top: 1px solid var(--border);
 }
 .t-avatar {
     width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
@@ -378,22 +315,14 @@ body::before {
     font-size: 10px; font-weight: 800; color: #fff; overflow: hidden;
 }
 .t-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.t-info { flex: 1; min-width: 0; }
-.t-name {
-    font-size: 12px; font-weight: 700; color: var(--text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.t-role {
-    font-family: var(--mono); font-size: 9px; color: var(--muted);
-    margin-top: 1px; text-transform: uppercase; letter-spacing: .8px;
-}
+.t-name { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-role { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 1px; text-transform: uppercase; letter-spacing: .8px; }
 .students-pill {
     font-family: var(--mono); font-size: 10px; color: var(--muted);
-    background: rgba(255,255,255,.04); border: 1px solid var(--border);
+    background: var(--input-bg); border: 1px solid var(--border);
     padding: 3px 9px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;
 }
 
-/* Action button */
 .card-action { display: flex; }
 .btn {
     flex: 1; height: 36px; border-radius: 9px;
@@ -401,26 +330,19 @@ body::before {
     cursor: pointer; transition: .15s; border: none;
     display: flex; align-items: center; justify-content: center; gap: 6px;
 }
-.btn-enroll {
-    background: rgba(52,211,153,.15); color: var(--green);
-    border: 1px solid rgba(52,211,153,.3);
-}
-.btn-enroll:hover { background: rgba(52,211,153,.25); border-color: rgba(52,211,153,.5); }
-.btn-unenroll {
-    background: rgba(248,113,113,.08); color: var(--red);
-    border: 1px solid rgba(248,113,113,.2);
-}
-.btn-unenroll:hover { background: rgba(248,113,113,.16); border-color: rgba(248,113,113,.4); }
+.btn-enroll   { background: rgba(34,197,94,.14);  color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+.btn-enroll:hover { background: rgba(34,197,94,.24); border-color: rgba(34,197,94,.5); }
+.btn-unenroll { background: rgba(239,68,68,.10); color: var(--red); border: 1px solid rgba(239,68,68,.22); }
+.btn-unenroll:hover { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.4); }
 
-/* ── Empty state ── */
+/* ── Empty ── */
 .empty-state {
     text-align: center; padding: 64px 40px;
-    background: var(--card); border: 1px dashed var(--border);
-    border-radius: var(--radius);
+    background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
 }
-.empty-icon { font-size: 40px; margin-bottom: 12px; opacity: .5; }
-.empty-title { font-size: 15px; font-weight: 700; color: var(--sub); margin-bottom: 5px; }
-.empty-sub { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.empty-icon  { font-size: 40px; margin-bottom: 12px; opacity: .5; }
+.empty-title { font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.empty-sub   { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 /* ── Toast ── */
 .toast {
@@ -430,21 +352,31 @@ body::before {
     display: none; animation: slideIn .22s ease;
 }
 .toast.show { display: flex; align-items: center; gap: 8px; }
-.toast.success {
-    background: rgba(52,211,153,.12); border: 1px solid rgba(52,211,153,.3);
-    color: var(--green);
-}
+.toast.success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3); color: var(--green); }
 @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ── Light theme overrides для цього файлу ── */
+body.light-theme .sidebar { box-shadow: 2px 0 16px rgba(0,0,0,.06); }
+body.light-theme .course-card:hover { box-shadow: 0 8px 24px rgba(99,102,241,.10); }
+body.light-theme .filter-select option { background: #ffffff; color: #1e293b; }
+body.light-theme .lang-badge { color: #4338ca; background: rgba(79,70,229,.10); border-color: rgba(79,70,229,.2); }
+body.light-theme .lang-dot { background: #0891b2; box-shadow: 0 0 8px rgba(8,145,178,.4); }
+body.light-theme .tag-level { color: #b45309; background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.22); }
+body.light-theme .tag-price { color: #15803d; background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.22); }
+body.light-theme .enrolled-chip { color: #15803d; background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.2); }
+body.light-theme .btn-enroll  { background: rgba(22,163,74,.12); color: #15803d; border-color: rgba(22,163,74,.28); }
+body.light-theme .btn-enroll:hover { background: rgba(22,163,74,.22); }
+body.light-theme .btn-unenroll { background: rgba(220,38,38,.08); color: #dc2626; border-color: rgba(220,38,38,.2); }
+body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.16); }
 </style>
 </head>
 <body>
 
-<!-- ══ SIDEBAR ══ -->
+<!-- SIDEBAR -->
 <aside class="sidebar">
     <div class="sidebar-logo">
         <div class="logo-text">Lingua<span>Hub</span></div>
     </div>
-
     <div class="sidebar-profile">
         <div class="s-avatar">
             <?php if (!empty($student['avatar_url']) && file_exists($student['avatar_url'])): ?>
@@ -456,7 +388,6 @@ body::before {
             <div class="profile-role">Студент</div>
         </div>
     </div>
-
     <nav class="sidebar-nav">
         <div class="nav-label">Меню</div>
         <a class="nav-item" href="dashboard_student.php">
@@ -481,7 +412,6 @@ body::before {
             Налаштування
         </a>
     </nav>
-
     <div class="sidebar-footer">
         <button class="theme-toggle" title="Змінити тему" style="width:100%;margin-bottom:8px;padding:8px;display:flex;align-items:center;justify-content:center">
             <span class="theme-toggle-icon">☀️</span>
@@ -493,12 +423,11 @@ body::before {
     </div>
 </aside>
 
-<!-- ══ MAIN ══ -->
+<!-- MAIN -->
 <main class="main">
     <div class="topbar">
         <div class="page-title">
-            <span class="page-title-icon">📚</span>
-            Каталог курсів
+            <span>📚</span> Каталог курсів
         </div>
         <form class="topbar-controls" method="GET">
             <div class="search-box">
@@ -517,7 +446,6 @@ body::before {
     </div>
 
     <div class="content">
-
         <?php if ($_GET['msg'] ?? false): ?>
         <div class="toast show success" id="msgToast">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -550,15 +478,12 @@ body::before {
                         $teacherName = trim(($course['teacher_first'] ?? '') . ' ' . ($course['teacher_last'] ?? ''));
                     ?>
                     <div class="course-card">
-                        <!-- Top row -->
                         <div class="card-top">
                             <span class="lang-badge"><?= htmlspecialchars($course['language']) ?></span>
                             <?php if ($isEnrolled): ?>
                                 <span class="enrolled-chip">✓ Записаний</span>
                             <?php endif; ?>
                         </div>
-
-                        <!-- Body -->
                         <div class="card-body">
                             <div class="course-title"><?= htmlspecialchars($course['title']) ?></div>
                             <?php if (!empty($course['description'])): ?>
@@ -569,8 +494,6 @@ body::before {
                                 <span class="tag tag-price"><?= htmlspecialchars($course['price']) ?> грн</span>
                             </div>
                         </div>
-
-                        <!-- Teacher -->
                         <div class="teacher-row">
                             <div class="t-avatar">
                                 <?php if (!empty($course['teacher_avatar']) && file_exists($course['teacher_avatar'])): ?>
@@ -583,8 +506,6 @@ body::before {
                             </div>
                             <div class="students-pill">👥 <?= $course['students_count'] ?></div>
                         </div>
-
-                        <!-- Action -->
                         <div class="card-action">
                             <?php if ($isEnrolled): ?>
                             <form method="POST" style="flex:1;">
@@ -606,9 +527,9 @@ body::before {
             </div>
             <?php endforeach; ?>
         <?php endif; ?>
-
     </div>
 </main>
 
+<script src="theme-switcher.js"></script>
 </body>
 </html>

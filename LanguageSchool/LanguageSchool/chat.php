@@ -423,9 +423,6 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         <div class="nav-item" data-view="tasks" title="Завдання" onclick="switchView('tasks')">
             ✓
         </div>
-        <div class="nav-item" data-view="tests" title="Тести" onclick="switchView('tests')">
-            📝
-        </div>
         <div class="nav-divider"></div>
         <div class="nav-item" data-view="meet" title="Meet" onclick="switchView('meet')">
             📞

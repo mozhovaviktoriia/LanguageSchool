@@ -304,6 +304,144 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
 
 @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 .task-detail { animation:fadeIn .2s ease; }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* LIGHT THEME — читабельний текст                            */
+/* ═══════════════════════════════════════════════════════════ */
+body.light-theme {
+    color: #0f172a;
+}
+
+/* Загальні текстові елементи */
+body.light-theme .ti-title,
+body.light-theme .td-title,
+body.light-theme .tl-title,
+body.light-theme .ps-text,
+body.light-theme .empty-text {
+    color: #0f172a !important;
+}
+
+body.light-theme .ti-meta,
+body.light-theme .sm-lbl,
+body.light-theme .nav-label,
+body.light-theme .td-desc,
+body.light-theme .fu-text,
+body.light-theme .rc-label,
+body.light-theme .rc-feedback-label,
+body.light-theme .section-label,
+body.light-theme .ps-label,
+body.light-theme .no-tasks {
+    color: #475569 !important;
+}
+
+/* Навігація */
+body.light-theme .nav-item { color: #475569 !important; }
+body.light-theme .nav-item:hover { color: #1e293b !important; }
+body.light-theme .nav-item.active { color: #4f46e5 !important; }
+
+/* Topbar */
+body.light-theme .topbar-title {
+    background: linear-gradient(90deg, #1e293b, #4f46e5) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+/* Ім'я студента в topbar (inline style color:var(--muted)) */
+body.light-theme .topbar span[style*="color:var(--muted)"],
+body.light-theme .topbar span[style*="color: var(--muted)"] {
+    color: #475569 !important;
+}
+
+/* Stats mini */
+body.light-theme .sm-item { background: #fff; }
+
+/* Task list panel */
+body.light-theme .task-list-panel { background: rgba(241,245,249,.7) !important; }
+body.light-theme .tl-header { background: rgba(255,255,255,.97) !important; border-bottom-color: #e2e8f0 !important; }
+body.light-theme .task-item { border-bottom-color: #e2e8f0 !important; color: #0f172a !important; }
+body.light-theme .task-item:hover { background: rgba(79,70,229,.04) !important; }
+body.light-theme .task-item.active { background: rgba(79,70,229,.1) !important; border-left-color: #4f46e5 !important; }
+body.light-theme .task-item.active .ti-title { color: #4f46e5 !important; }
+body.light-theme .ti-icon { background: rgba(79,70,229,.07) !important; }
+
+/* Task detail header */
+body.light-theme .td-header { background: rgba(79,70,229,.03) !important; border-bottom-color: #e2e8f0 !important; }
+
+/* Badges — підкоригувати для видимості на світлому */
+body.light-theme .tb-type    { background: rgba(79,70,229,.12) !important;  color: #4f46e5 !important; }
+body.light-theme .tb-score   { background: rgba(22,163,74,.12) !important;  color: #16a34a !important; }
+body.light-theme .tb-teacher { background: rgba(8,145,178,.12) !important;  color: #0891b2 !important; }
+body.light-theme .tb-deadline { background: rgba(217,119,6,.12) !important; color: #b45309 !important; }
+body.light-theme .tb-deadline.overdue { background: rgba(220,38,38,.12) !important; color: #dc2626 !important; }
+body.light-theme .s-new      { background: rgba(100,116,139,.12) !important; color: #475569 !important; }
+body.light-theme .s-pending  { background: rgba(217,119,6,.12) !important;   color: #b45309 !important; }
+body.light-theme .s-graded   { background: rgba(22,163,74,.12) !important;   color: #16a34a !important; }
+body.light-theme .s-returned { background: rgba(220,38,38,.12) !important;   color: #dc2626 !important; }
+
+/* Result cards */
+body.light-theme .rc-label { color: #64748b !important; }
+body.light-theme .rc-feedback {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+body.light-theme .result-card.returned .rc-feedback { color: #0f172a !important; }
+
+/* "Повернено" — текст всередині result-card */
+body.light-theme .result-card.returned > div[style*="color:#fca5a5"] {
+    color: #dc2626 !important;
+}
+
+/* Pending card — "Здано: ..." */
+body.light-theme .result-card.pending div[style*="color:var(--muted)"],
+body.light-theme .result-card.pending div[style*="color: var(--muted)"] {
+    color: #475569 !important;
+}
+
+/* Submit form */
+body.light-theme .submit-form {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+}
+body.light-theme .sf-textarea {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+}
+body.light-theme .sf-textarea:focus {
+    border-color: #4f46e5 !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(79,70,229,.12) !important;
+}
+body.light-theme .sf-textarea::placeholder { color: #94a3b8 !important; }
+
+/* File upload */
+body.light-theme .file-upload-area {
+    border-color: #cbd5e1 !important;
+}
+body.light-theme .file-upload-area:hover {
+    border-color: #4f46e5 !important;
+    background: rgba(79,70,229,.04) !important;
+}
+
+/* Prev submission */
+body.light-theme .prev-submission {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Flash */
+body.light-theme .flash.ok  { color: #16a34a !important; }
+body.light-theme .flash.err { color: #dc2626 !important; }
+
+/* Sidebar */
+body.light-theme .sidebar { background: rgba(255,255,255,.97) !important; border-right-color: #e2e8f0 !important; }
+body.light-theme .logo { border-bottom-color: #e2e8f0 !important; }
+body.light-theme .sidebar-bottom { border-top-color: #e2e8f0 !important; }
+
+/* Topbar */
+body.light-theme .topbar { background: rgba(241,245,249,.95) !important; border-bottom-color: #e2e8f0 !important; }
 </style>
 </head>
 <body>
@@ -316,6 +454,7 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
     <span class="nav-label">Меню</span>
     <a class="nav-item" href="dashboard_student.php"><span class="nav-icon">📚</span> Курси</a>
     <a class="nav-item active" href="homework_student.php"><span class="nav-icon">📋</span> Завдання</a>
+
     <a class="nav-item" href="schedule_student.php"><span class="nav-icon">📅</span> Розклад</a>
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>

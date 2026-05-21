@@ -482,7 +482,6 @@ body::before {
     <a class="nav-item" href="students.php"><span class="nav-icon">👨‍🎓</span> Мої учні</a>
     <a class="nav-item" href="schedule_teacher.php"><span class="nav-icon">📅</span> Розклад</a>
     <a class="nav-item" href="tasks.php"><span class="nav-icon">✓</span> Завдання</a>
-    <a class="nav-item" href="tests.php"><span class="nav-icon">📝</span> Тести</a>
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>
     <div class="sidebar-bottom">

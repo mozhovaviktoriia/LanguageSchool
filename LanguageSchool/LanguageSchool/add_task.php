@@ -278,7 +278,6 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
     <a class="nav-item" href="students.php"><span class="nav-icon">👨‍🎓</span> Мої учні</a>
     <a class="nav-item" href="schedule_teacher.php"><span class="nav-icon">📅</span> Розклад</a>
     <a class="nav-item active" href="tasks.php"><span class="nav-icon">✓</span> Завдання</a>
-    <a class="nav-item" href="tests.php"><span class="nav-icon">📝</span> Тести</a>
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>
     <div class="sidebar-bottom">        <button class="theme-toggle" title="Змінити тему" style="width:100%;margin-bottom:8px;padding:8px">

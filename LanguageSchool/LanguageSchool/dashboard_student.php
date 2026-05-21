@@ -117,6 +117,25 @@ $avgScore = $stats['avg_score'] ?? null;
     --radius:14px; --font:'Syne',sans-serif; --mono:'JetBrains Mono',monospace;
     --sidebar:230px;
 }
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg:#f8f9fa;
+        --surface:#ffffff;
+        --card:#f5f6f8;
+        --border:#d4d9e0;
+        --accent:#6366f1;
+        --teal:#0891b2;
+        --green:#16a34a;
+        --amber:#d97706;
+        --red:#dc2626;
+        --text:#000000;
+        --muted:#1f2937;
+    }
+    body::before {
+        background: radial-gradient(ellipse 80% 50% at 5% 0%, rgba(99,102,241,.08) 0%, transparent 55%), radial-gradient(ellipse 55% 40% at 95% 90%, rgba(8,145,178,.06) 0%, transparent 55%);
+    }
+}
 body { font-family:var(--font); background:var(--bg); color:var(--text); min-height:100vh; display:flex; overflow:hidden; }
 body::before { content:''; position:fixed; inset:0; background: radial-gradient(ellipse 80% 50% at 5% 0%,rgba(99,102,241,.13) 0%,transparent 55%), radial-gradient(ellipse 55% 40% at 95% 90%,rgba(34,211,238,.09) 0%,transparent 55%); pointer-events:none; z-index:0; }
 
@@ -156,37 +175,34 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .topbar-btn { display:flex; align-items:center; gap:7px; padding:8px 14px; border-radius:9px; border:1px solid var(--border); background:var(--surface); color:var(--muted); font-family:var(--mono); font-size:11px; text-decoration:none; transition:.18s; font-weight:600; }
 .topbar-btn:hover { color:var(--text); border-color:rgba(99,102,241,.4); background:rgba(99,102,241,.08); }
 
-.content { padding:24px 30px; display:flex; flex-direction:column; gap:20px; }
+.content { padding:32px 40px; display:flex; flex-direction:column; gap:28px; }
 
 /* Statistics display */
-.stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
-.stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px 16px; position:relative; overflow:hidden; transition:border-color .2s,transform .2s; }
-.stat-card:hover { transform:translateY(-2px); }
-.stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; opacity:0; transition:opacity .25s; }
+.stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:8px; }
+.stat-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; position:relative; overflow:hidden; transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.stat-card:hover { transform:translateY(-4px); border-color:var(--accent); box-shadow:0 8px 16px rgba(99,102,241,.15); }
+.stat-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; opacity:0; transition:opacity .25s; }
 .stat-card.c-purple::after { background:linear-gradient(90deg,var(--accent),#818cf8); }
 .stat-card.c-teal::after   { background:linear-gradient(90deg,var(--teal),#67e8f9); }
 .stat-card.c-green::after  { background:linear-gradient(90deg,var(--green),#86efac); }
 .stat-card.c-amber::after  { background:linear-gradient(90deg,var(--amber),#fcd34d); }
 .stat-card:hover::after { opacity:1; }
-.stat-num { font-size:30px; font-weight:800; letter-spacing:-1px; line-height:1; margin:8px 0 5px; }
+.stat-num { font-size:36px; font-weight:800; letter-spacing:-1px; line-height:1; margin:12px 0 8px; }
 .c-purple .stat-num { color:#a5b4fc; } .c-teal .stat-num { color:var(--teal); } .c-green .stat-num { color:var(--green); } .c-amber .stat-num { color:var(--amber); }
-.stat-label { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:.5px; }
+.stat-label { font-family:var(--mono); font-size:11px; color:var(--muted); letter-spacing:.5px; font-weight:600; }
 
 /* Navigation links */
-.quick-links { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
-.quick-link { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:16px 10px; border-radius:12px; border:1px solid var(--border); background:var(--card); text-decoration:none; color:var(--muted); font-size:12px; font-weight:700; transition:.2s; text-align:center; }
-.quick-link:hover { color:var(--text); border-color:rgba(99,102,241,.4); background:rgba(99,102,241,.07); transform:translateY(-2px); }
-.quick-link-icon { font-size:22px; }
+.quick-links { display:none; }
 
 /* Course card */
-.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
-.card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:28px; transition:all .2s; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+.card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; border-bottom:1px solid rgba(99,102,241,.1); padding-bottom:16px; }
 .card-title { font-size:14px; font-weight:800; }
 
 /* Courses grid layout */
-.courses-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:13px; }
-.course-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color .2s,transform .2s; display:flex; flex-direction:column; }
-.course-card:hover { border-color:rgba(99,102,241,.4); transform:translateY(-3px); }
+.courses-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:16px; }
+.course-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:all .2s; display:flex; flex-direction:column; box-shadow:0 2px 6px rgba(0,0,0,.06); }
+.course-card:hover { border-color:var(--accent); transform:translateY(-6px); box-shadow:0 12px 24px rgba(99,102,241,.12); }
 .course-flag { width:100%; height:66px; display:flex; align-items:center; justify-content:center; font-size:28px; }
 .flag-en { background:linear-gradient(135deg,#1a237e,#283593); }
 .flag-de { background:linear-gradient(135deg,#1a1a1a,#7f0000); }
@@ -202,14 +218,14 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .course-footer { display:flex; align-items:center; justify-content:space-between; margin-top:auto; padding-top:7px; }
 .course-price { font-family:var(--mono); font-size:11px; font-weight:700; color:var(--amber); }
 
-.enroll-btn { font-family:var(--font); font-size:10px; font-weight:700; padding:6px 12px; border-radius:8px; background:rgba(99,102,241,.15); color:#a5b4fc; border:1px solid rgba(99,102,241,.3); cursor:pointer; transition:.18s; }
-.enroll-btn:hover { background:rgba(99,102,241,.3); border-color:rgba(99,102,241,.6); color:#fff; }
+.enroll-btn { font-family:var(--font); font-size:10px; font-weight:700; padding:8px 16px; border-radius:8px; background:var(--accent); color:#fff; border:none; cursor:pointer; transition:.18s; box-shadow:0 2px 8px rgba(99,102,241,.3); }
+.enroll-btn:hover { background:#4f46e5; box-shadow:0 4px 12px rgba(99,102,241,.4); transform:translateY(-1px); }
 .enrolled-badge { display:inline-flex; align-items:center; gap:4px; font-family:var(--mono); font-size:9px; padding:5px 10px; border-radius:8px; background:rgba(34,197,94,.1); color:var(--green); border:1px solid rgba(34,197,94,.2); }
-.leave-btn { font-family:var(--font); font-size:10px; font-weight:700; padding:6px 12px; border-radius:8px; background:rgba(239,68,68,.1); color:#fca5a5; border:1px solid rgba(239,68,68,.2); cursor:pointer; transition:.18s; }
-.leave-btn:hover { background:rgba(239,68,68,.25); border-color:rgba(239,68,68,.5); color:#fff; }
+.leave-btn { font-family:var(--font); font-size:10px; font-weight:700; padding:8px 16px; border-radius:8px; background:rgba(239,68,68,.12); color:#ef4444; border:1px solid rgba(239,68,68,.3); cursor:pointer; transition:.18s; }
+.leave-btn:hover { background:rgba(239,68,68,.2); border-color:rgba(239,68,68,.5); color:#dc2626; }
 
 /* Grid layout structure */
-.two-col { display:grid; grid-template-columns:1fr 220px; gap:20px; align-items:start; }
+.two-col { display:grid; grid-template-columns:1fr 240px; gap:28px; align-items:start; }
 .right-col { display:flex; flex-direction:column; gap:14px; }
 
 /* Calendar widget */
@@ -228,7 +244,7 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 /* Modal dialog */
 .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); backdrop-filter:blur(6px); z-index:200; align-items:center; justify-content:center; }
 .modal-overlay.open { display:flex; }
-.modal-box { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:32px; max-width:360px; width:90%; text-align:center; animation:fadeUp .25s ease; }
+.modal-box { background:var(--card); border:1px solid var(--border); border-radius:18px; padding:40px; max-width:380px; width:90%; text-align:center; animation:fadeUp .25s ease; box-shadow:0 20px 60px rgba(0,0,0,.3); }
 .modal-icon { font-size:40px; margin-bottom:12px; }
 .modal-title { font-size:17px; font-weight:800; margin-bottom:8px; }
 .modal-sub { font-family:var(--mono); font-size:11px; color:var(--muted); margin-bottom:24px; line-height:1.6; }
@@ -238,7 +254,7 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .modal-confirm { padding:10px 24px; border-radius:10px; background:rgba(239,68,68,.15); color:#fca5a5; border:1px solid rgba(239,68,68,.3); font-family:var(--font); font-size:13px; font-weight:700; cursor:pointer; transition:.18s; }
 .modal-confirm:hover { background:rgba(239,68,68,.3); color:#fff; }
 
-.empty-state { display:flex; flex-direction:column; align-items:center; padding:32px 24px; gap:10px; text-align:center; }
+.empty-state { display:flex; flex-direction:column; align-items:center; padding:48px 32px; gap:12px; text-align:center; }
 .empty-icon { font-size:36px; opacity:.5; }
 .empty-title { font-size:13px; font-weight:700; }
 .empty-sub { font-family:var(--mono); font-size:10px; color:var(--muted); max-width:240px; line-height:1.6; }
@@ -246,11 +262,11 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
 
 /* Reminders styling */
-.reminders-block { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.reminders-block { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
 .reminders-title { font-size:14px; font-weight:800; margin-bottom:16px; text-transform:uppercase; letter-spacing:.5px; color:var(--text); }
 .reminders-list { display:flex; flex-direction:column; gap:10px; }
-.reminder-item { display:flex; flex-direction:column; gap:6px; padding:14px; background:rgba(99,102,241,.06); border:1px solid rgba(99,102,241,.2); border-radius:12px; transition:.2s; }
-.reminder-item:hover { background:rgba(99,102,241,.12); border-color:rgba(99,102,241,.4); }
+.reminder-item { display:flex; flex-direction:column; gap:6px; padding:16px; background:linear-gradient(135deg,rgba(99,102,241,.08) 0%,rgba(34,211,238,.05) 100%); border:1px solid rgba(99,102,241,.25); border-radius:12px; transition:.2s; }
+.reminder-item:hover { background:linear-gradient(135deg,rgba(99,102,241,.15) 0%,rgba(34,211,238,.1) 100%); border-color:rgba(99,102,241,.4); }
 .reminder-title { font-size:12px; font-weight:700; color:var(--text); }
 .reminder-course { font-size:10px; color:#a5b4fc; font-family:var(--mono); margin-bottom:2px; }
 .reminder-datetime { display:flex; align-items:center; gap:6px; font-size:11px; }
@@ -298,12 +314,6 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
         <a class="nav-item active" href="dashboard_student.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             Дашборд
-        </a>
-
-        <a class="nav-item" href="courses_catalog.php">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-            Всі курси
-            <span class="nav-badge"><?= count($allCourses) ?></span>
         </a>
 
         <a class="nav-item" href="schedule_student.php">
@@ -370,18 +380,13 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
                 <div class="stat-num"><?= count($myCourses) ?></div>
                 <div class="stat-label">Активні курси</div>
             </div>
-            <div class="stat-card c-teal">
-                <div style="font-size:16px">🗓</div>
-                <div class="stat-num"><?= count($upcomingLessons) ?></div>
-                <div class="stat-label">Найближчі заняття</div>
-            </div>
             <div class="stat-card c-green">
                 <div style="font-size:16px">⭐</div>
                 <div class="stat-num"><?= $avgScore !== null ? $avgScore : '—' ?></div>
                 <div class="stat-label">Середній бал</div>
             </div>
             <div class="stat-card c-amber">
-                <div style="font-size:16px">📝</div>
+                <div style="font-size:16px">✍️</div>
                 <div class="stat-num"><?= $submittedCount ?></div>
                 <div class="stat-label">Завдань здано</div>
             </div>
@@ -427,46 +432,6 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
                             <?php endforeach; ?>
                         </div>
                     <?php endif; ?>
-                </div>
-
-                <!-- КАТАЛОГ -->
-                <div class="card">
-                    <div class="card-head">
-                        <div class="card-title">Каталог курсів</div>
-                        <span style="font-family:var(--mono);font-size:10px;color:var(--muted)"><?= count($allCourses) ?> курсів</span>
-                    </div>
-                    <div class="courses-grid">
-                        <?php foreach ($allCourses as $c):
-                            $flags = ['en'=>'🇬🇧','de'=>'🇩🇪','ja'=>'🇯🇵','fr'=>'🇫🇷'];
-                            $flag = $flags[$c['code']] ?? '🌐';
-                            $isEnrolled = in_array($c['id'], $enrolledIds);
-                            $teacherName = trim(($c['teacher_first'] ?? '') . ' ' . ($c['teacher_last'] ?? ''));
-                        ?>
-                        <div class="course-card">
-                            <div class="course-flag flag-<?= htmlspecialchars($c['code']) ?>"><?= $flag ?></div>
-                            <div class="course-body">
-                                <div class="course-lang-tag"><?= htmlspecialchars($c['name_ua']) ?></div>
-                                <div class="course-name"><?= htmlspecialchars($c['title']) ?></div>
-                                <div class="course-desc"><?= htmlspecialchars($c['description']) ?></div>
-                                <?php if ($teacherName): ?>
-                                <div class="course-teacher">Викладач: <span><?= htmlspecialchars($teacherName) ?></span></div>
-                                <?php endif; ?>
-                                <div class="course-level"><?= htmlspecialchars($c['level']) ?></div>
-                                <div class="course-footer">
-                                    <span class="course-price"><?= number_format($c['price'], 0) ?> грн</span>
-                                    <?php if ($isEnrolled): ?>
-                                        <span class="enrolled-badge">✓ Записаний</span>
-                                    <?php else: ?>
-                                        <form method="POST" style="margin:0">
-                                            <input type="hidden" name="enroll_course_id" value="<?= htmlspecialchars($c['id']) ?>">
-                                            <button type="submit" class="enroll-btn">Записатись →</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        <?php endforeach; ?>
-                    </div>
                 </div>
 
             </div>

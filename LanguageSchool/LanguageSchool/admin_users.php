@@ -380,12 +380,145 @@ tbody td { padding: 11px 14px; vertical-align: middle; }
     font-weight: 600;
     text-decoration: none;
     transition: .15s;
+    border: 1px solid transparent;
 }
 .tbl-edit { background: rgba(59,130,246,.12); color: #93c5fd; }
 .tbl-del  { background: rgba(239,68,68,.1);  color: #fca5a5; }
 .tbl-edit:hover { background: rgba(59,130,246,.28); }
 .tbl-del:hover  { background: rgba(239,68,68,.25); }
 
+/* ═══════════════════════════════════════════════════════════ */
+/* LIGHT THEME                                                 */
+/* ═══════════════════════════════════════════════════════════ */
+
+/* Header */
+body.light-theme header {
+    background: rgba(255,255,255,.97) !important;
+    border-bottom-color: #e2e8f0 !important;
+}
+body.light-theme .logo { color: #0f172a; }
+body.light-theme .logo span { color: #4f46e5; }
+body.light-theme .header-sub { color: #94a3b8; }
+body.light-theme .back-btn {
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
+    background: transparent !important;
+}
+body.light-theme .back-btn:hover {
+    color: #4f46e5 !important;
+    border-color: #4f46e5 !important;
+    background: rgba(79,70,229,.07) !important;
+}
+
+/* Form panel */
+body.light-theme .form-panel {
+    background: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 2px 16px rgba(0,0,0,.06);
+}
+body.light-theme .panel-title { color: #0f172a; }
+body.light-theme .panel-title::before { background: #4f46e5; }
+
+body.light-theme .field label { color: #64748b; }
+
+body.light-theme .field input,
+body.light-theme .field select {
+    background: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+}
+body.light-theme .field input:focus,
+body.light-theme .field select:focus {
+    border-color: #4f46e5 !important;
+    background: #fff !important;
+    box-shadow: 0 0 0 3px rgba(79,70,229,.1) !important;
+}
+body.light-theme .field input::placeholder { color: #94a3b8 !important; }
+body.light-theme .field select option { background: #fff; color: #0f172a; }
+
+/* Language pills */
+body.light-theme .block-label { color: #64748b; }
+body.light-theme .lang-pill span {
+    background: #f1f5f9 !important;
+    border-color: #e2e8f0 !important;
+    color: #475569 !important;
+}
+body.light-theme .lang-pill span:hover {
+    border-color: #4f46e5 !important;
+    color: #4f46e5 !important;
+    background: rgba(79,70,229,.06) !important;
+}
+body.light-theme .lang-pill input:checked + span {
+    color: #0891b2 !important;
+    border-color: #0891b2 !important;
+    background: rgba(8,145,178,.1) !important;
+}
+
+/* Submit button */
+body.light-theme .submit-btn {
+    background: linear-gradient(135deg, #4f46e5, #6366f1) !important;
+    box-shadow: 0 4px 14px rgba(79,70,229,.3);
+    color: #fff !important;
+}
+body.light-theme .submit-btn:hover {
+    background: linear-gradient(135deg, #4338ca, #4f46e5) !important;
+    box-shadow: 0 6px 20px rgba(79,70,229,.4);
+}
+
+/* Section heading */
+body.light-theme .sec-title { color: #0f172a; }
+body.light-theme .sec-count {
+    background: #e2e8f0 !important;
+    color: #64748b !important;
+}
+
+/* Table */
+body.light-theme .tbl-wrap {
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,.05);
+}
+body.light-theme thead tr { background: #f8fafc !important; }
+body.light-theme thead th {
+    color: #64748b !important;
+    border-bottom-color: #e2e8f0 !important;
+}
+body.light-theme tbody tr { border-bottom-color: #f1f5f9 !important; }
+body.light-theme tbody tr:hover { background: rgba(79,70,229,.04) !important; }
+body.light-theme tbody td { background: #ffffff; }
+
+body.light-theme .nm { color: #0f172a !important; }
+body.light-theme .em { color: #64748b !important; }
+body.light-theme .lc { color: #0891b2 !important; }
+
+/* Role badges */
+body.light-theme .role-student { background: rgba(79,70,229,.1)  !important; color: #4f46e5 !important; }
+body.light-theme .role-teacher { background: rgba(8,145,178,.1)  !important; color: #0891b2 !important; }
+body.light-theme .role-admin   { background: rgba(217,119,6,.12) !important; color: #b45309 !important; }
+
+/* Status dots */
+body.light-theme .s-active   { color: #16a34a !important; }
+body.light-theme .s-inactive { color: #d97706 !important; }
+body.light-theme .s-banned   { color: #dc2626 !important; }
+
+/* Action buttons */
+body.light-theme .tbl-edit {
+    background: rgba(59,130,246,.08) !important;
+    color: #2563eb !important;
+    border-color: rgba(59,130,246,.2) !important;
+}
+body.light-theme .tbl-edit:hover {
+    background: rgba(59,130,246,.16) !important;
+    border-color: rgba(59,130,246,.4) !important;
+}
+body.light-theme .tbl-del {
+    background: rgba(220,38,38,.07) !important;
+    color: #dc2626 !important;
+    border-color: rgba(220,38,38,.15) !important;
+}
+body.light-theme .tbl-del:hover {
+    background: rgba(220,38,38,.14) !important;
+    border-color: rgba(220,38,38,.35) !important;
+}
 </style>
 </head>
 <body>

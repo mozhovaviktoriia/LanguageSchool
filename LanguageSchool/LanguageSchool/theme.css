@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════ */
-/* DARK THEME (Default) */
+/* DARK THEME (Default)                                         */
 /* ════════════════════════════════════════════════════════════ */
 :root {
     --bg:      #07080f;
@@ -18,104 +18,336 @@
     --mono:    'JetBrains Mono', monospace;
     --sidebar: 220px;
     --right:   280px;
+
+    /* Компоненти для темної теми */
+    --sidebar-bg:    rgba(13, 17, 23, 0.97);
+    --topbar-bg:     rgba(7, 8, 15, 0.90);
+    --header-bg:     rgba(13, 17, 23, 0.85);
+    --panel-bg:      rgba(13, 17, 23, 0.95);
+    --overlay-bg:    rgba(13, 17, 23, 0.88);
+    --side-nav-bg:   rgba(7, 8, 15, 0.98);
+    --chat-area-bg:  rgba(13, 17, 23, 0.96);
+    --input-area-bg: rgba(13, 17, 23, 0.95);
+    --sub-bg:        rgba(13, 17, 23, 0.50);
+
+    --hover-row:    rgba(255, 255, 255, 0.03);
+    --hover-nav:    rgba(255, 255, 255, 0.04);
+    --input-bg:     rgba(255, 255, 255, 0.04);
+    --stripe-bg:    rgba(255, 255, 255, 0.02);
+    --progress-bg:  rgba(255, 255, 255, 0.07);
+    --ring-stroke:  rgba(255, 255, 255, 0.06);
+
+    --glow-1: rgba(99, 102, 241, 0.13);
+    --glow-2: rgba(34, 211, 238, 0.09);
 }
 
 /* ════════════════════════════════════════════════════════════ */
-/* LIGHT THEME */
+/* LIGHT THEME                                                  */
 /* ════════════════════════════════════════════════════════════ */
 body.light-theme {
-    --bg:      #f8f9fa;
+    --bg:      #f1f5f9;
     --surface: #ffffff;
-    --card:    #f3f4f6;
-    --border:  #e5e7eb;
+    --card:    #f8fafc;
+    --border:  #e2e8f0;
     --accent:  #4f46e5;
     --teal:    #0891b2;
     --green:   #16a34a;
     --amber:   #d97706;
     --red:     #dc2626;
-    --text:    #1f2937;
-    --muted:   #6b7280;
+    --text:    #1e293b;
+    --muted:   #64748b;
+
+    /* Компоненти для світлої теми */
+    --sidebar-bg:    rgba(255, 255, 255, 0.97);
+    --topbar-bg:     rgba(241, 245, 249, 0.95);
+    --header-bg:     rgba(255, 255, 255, 0.92);
+    --panel-bg:      rgba(255, 255, 255, 0.97);
+    --overlay-bg:    rgba(255, 255, 255, 0.92);
+    --side-nav-bg:   rgba(248, 250, 252, 0.99);
+    --chat-area-bg:  rgba(241, 245, 249, 0.97);
+    --input-area-bg: rgba(255, 255, 255, 0.97);
+    --sub-bg:        rgba(241, 245, 249, 0.80);
+
+    --hover-row:    rgba(79, 70, 229, 0.04);
+    --hover-nav:    rgba(79, 70, 229, 0.06);
+    --input-bg:     rgba(79, 70, 229, 0.04);
+    --stripe-bg:    rgba(79, 70, 229, 0.02);
+    --progress-bg:  rgba(79, 70, 229, 0.10);
+    --ring-stroke:  rgba(79, 70, 229, 0.12);
+
+    --glow-1: rgba(99, 102, 241, 0.06);
+    --glow-2: rgba(8, 145, 178, 0.04);
 }
 
-/* Adjust light theme specific styles */
+/* ════════════════════════════════════════════════════════════ */
+/* ПЕРЕВИЗНАЧЕННЯ ХАРДКОДОВАНИХ КОЛЬОРІВ У LIGHT ТЕМІ          */
+/* ════════════════════════════════════════════════════════════ */
+
+/* body::before — фоновий глоу */
+body.light-theme::before {
+    background:
+        radial-gradient(ellipse 80% 50% at 5% 0%,  var(--glow-1) 0%, transparent 55%),
+        radial-gradient(ellipse 55% 40% at 95% 90%, var(--glow-2) 0%, transparent 55%) !important;
+}
+
+/* Sidebar */
 body.light-theme .sidebar {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--sidebar-bg) !important;
+    border-right-color: var(--border) !important;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.06);
 }
 
+/* Topbar */
 body.light-theme .topbar {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--topbar-bg) !important;
+    border-bottom-color: var(--border) !important;
 }
 
+/* Header (admin pages) */
+body.light-theme header {
+    background: var(--header-bg) !important;
+    border-bottom-color: var(--border) !important;
+}
+
+/* Right panel */
 body.light-theme .right-panel {
-    background: rgba(255, 255, 255, 0.95);
+    background: var(--panel-bg) !important;
+    border-left-color: var(--border) !important;
 }
 
-body.light-theme .search-wrap input::placeholder {
-    color: #9ca3af;
+/* Chat specific */
+body.light-theme .side-nav {
+    background: var(--side-nav-bg) !important;
+    border-right-color: var(--border) !important;
 }
 
+body.light-theme .chat-area,
+body.light-theme .message-area {
+    background: var(--chat-area-bg) !important;
+}
+
+body.light-theme .input-area {
+    background: var(--input-area-bg) !important;
+    border-top-color: var(--border) !important;
+}
+
+/* Panel overlays */
+body.light-theme .sub-list-panel,
+body.light-theme .grade-panel {
+    background: var(--sub-bg) !important;
+}
+
+body.light-theme .sub-list-header,
+body.light-theme .grade-panel-header,
+body.light-theme .tl-header {
+    background: var(--panel-bg) !important;
+    border-bottom-color: var(--border) !important;
+}
+
+body.light-theme .task-list-panel {
+    background: rgba(241, 245, 249, 0.60) !important;
+}
+
+/* Nav items hover */
+body.light-theme .nav-item:hover {
+    background: var(--hover-nav) !important;
+    color: var(--accent) !important;
+}
+
+body.light-theme .nav-item.active {
+    background: rgba(79, 70, 229, 0.12) !important;
+    border-color: rgba(79, 70, 229, 0.3) !important;
+    color: var(--accent) !important;
+}
+
+/* Table rows hover */
+body.light-theme .t-row:hover,
+body.light-theme .l-row:hover,
+body.light-theme .sub-list-item:hover,
+body.light-theme .task-item:hover,
+body.light-theme .conv-item:hover {
+    background: var(--hover-row) !important;
+}
+
+body.light-theme thead tr {
+    background: rgba(79, 70, 229, 0.04) !important;
+}
+
+body.light-theme .grade-table tr:hover td {
+    background: rgba(79, 70, 229, 0.03) !important;
+}
+
+/* Inputs and textareas */
+body.light-theme .sf-textarea,
+body.light-theme textarea,
+body.light-theme input[type="text"],
+body.light-theme input[type="email"],
+body.light-theme input[type="password"],
+body.light-theme input[type="number"],
+body.light-theme input[type="search"],
+body.light-theme select {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--text) !important;
+}
+
+body.light-theme .sf-textarea {
+    background: var(--input-bg) !important;
+}
+
+/* Progress bars and rings */
+body.light-theme .score-bar-wrap,
+body.light-theme .cs-progress,
+body.light-theme .dist-bar-wrap {
+    background: var(--progress-bg) !important;
+}
+
+body.light-theme .ring-bg {
+    stroke: var(--ring-stroke) !important;
+}
+
+/* Welcome banner */
+body.light-theme .welcome-banner {
+    background: linear-gradient(135deg, rgba(79, 70, 229, 0.10) 0%, rgba(8, 145, 178, 0.06) 100%);
+    border: 1px solid rgba(79, 70, 229, 0.18);
+}
+
+body.light-theme .welcome-title {
+    background: linear-gradient(90deg, #1e293b, #4f46e5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Logo */
 body.light-theme .logo-text {
     background: linear-gradient(90deg, #4f46e5, #0891b2);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
-body.light-theme .welcome-banner {
-    background: linear-gradient(135deg, rgba(79, 70, 229, 0.12) 0%, rgba(8, 145, 178, 0.08) 100%);
-    border: 1px solid rgba(79, 70, 229, 0.2);
+/* Cards */
+body.light-theme .card,
+body.light-theme .stat-card,
+body.light-theme .course-card {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 
-body.light-theme .welcome-title {
-    background: linear-gradient(90deg, #1f2937, #4f46e5);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+/* Quick links */
+body.light-theme .quick-link {
+    background: var(--card) !important;
+    border-color: var(--border) !important;
+    color: var(--muted) !important;
 }
 
-body.light-theme .help-box {
-    background: rgba(79, 70, 229, 0.06);
-    border: 1px solid rgba(79, 70, 229, 0.15);
+body.light-theme .quick-link:hover {
+    border-color: rgba(79, 70, 229, 0.4) !important;
+    background: rgba(79, 70, 229, 0.06) !important;
+    color: var(--accent) !important;
 }
 
-body.light-theme .t-row:hover,
-body.light-theme .l-row:hover {
-    background: rgba(79, 70, 229, 0.05);
+/* Buttons */
+body.light-theme .topbar-btn,
+body.light-theme .h-btn {
+    background: var(--surface) !important;
+    border-color: var(--border) !important;
+    color: var(--muted) !important;
 }
 
-body.light-theme .reminder-item {
-    background: rgba(79, 70, 229, 0.05);
-    border: 1px solid rgba(79, 70, 229, 0.15);
+body.light-theme .topbar-btn:hover,
+body.light-theme .h-btn:hover {
+    border-color: rgba(79, 70, 229, 0.4) !important;
+    background: rgba(79, 70, 229, 0.06) !important;
+    color: var(--accent) !important;
 }
 
-body.light-theme .reminder-item:hover {
-    background: rgba(79, 70, 229, 0.1);
-    border-color: rgba(79, 70, 229, 0.3);
+/* Logout button */
+body.light-theme .logout,
+body.light-theme .logout-btn {
+    background: rgba(220, 38, 38, 0.06) !important;
+    border-color: rgba(220, 38, 38, 0.2) !important;
+    color: #dc2626 !important;
 }
 
-body.light-theme .cal-day:hover {
-    background: rgba(79, 70, 229, 0.1);
+body.light-theme .logout:hover,
+body.light-theme .logout-btn:hover {
+    background: rgba(220, 38, 38, 0.12) !important;
+    border-color: rgba(220, 38, 38, 0.4) !important;
 }
 
-body.light-theme .logout {
-    background: rgba(220, 38, 38, 0.08);
-    border: 1px solid rgba(220, 38, 38, 0.2);
-    color: #dc2626;
-}
-
-body.light-theme .logout:hover {
-    background: rgba(220, 38, 38, 0.15);
-    border-color: rgba(220, 38, 38, 0.4);
-}
-
+/* Profile button */
 body.light-theme .profile-btn {
-    background: linear-gradient(135deg, #4f46e5, #4338ca);
+    background: linear-gradient(135deg, #4f46e5, #4338ca) !important;
     box-shadow: 0 4px 16px rgba(79, 70, 229, 0.2);
 }
 
-body.light-theme .profile-btn:hover {
-    box-shadow: 0 6px 20px rgba(79, 70, 229, 0.3);
+/* Search */
+body.light-theme .search-wrap input::placeholder {
+    color: #94a3b8;
 }
 
-/* Theme toggle button */
+/* Reminder */
+body.light-theme .reminder-item {
+    background: rgba(79, 70, 229, 0.04);
+    border: 1px solid rgba(79, 70, 229, 0.12);
+}
+
+body.light-theme .reminder-item:hover {
+    background: rgba(79, 70, 229, 0.08);
+    border-color: rgba(79, 70, 229, 0.25);
+}
+
+/* Calendar */
+body.light-theme .cal-day:hover {
+    background: rgba(79, 70, 229, 0.08) !important;
+}
+
+/* Help box */
+body.light-theme .help-box {
+    background: rgba(79, 70, 229, 0.05);
+    border: 1px solid rgba(79, 70, 229, 0.12);
+}
+
+/* Tab buttons */
+body.light-theme .tab-btn:hover {
+    background: var(--hover-nav) !important;
+    color: var(--accent) !important;
+}
+
+/* Nav badge */
+body.light-theme .nav-badge {
+    background: rgba(79, 70, 229, 0.12);
+    color: var(--accent);
+}
+
+/* Sub/section headers */
+body.light-theme .sub-header:hover {
+    background: var(--hover-row) !important;
+}
+
+/* Misc backgrounds */
+body.light-theme .ti-icon {
+    background: rgba(79, 70, 229, 0.06) !important;
+}
+
+body.light-theme .rc-feedback,
+body.light-theme .prev-submission,
+body.light-theme .submitted-info {
+    background: rgba(79, 70, 229, 0.03) !important;
+    border-color: var(--border) !important;
+}
+
+body.light-theme .s-badge.neutral {
+    background: rgba(100, 116, 139, 0.10) !important;
+    color: var(--muted) !important;
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/* THEME TOGGLE BUTTON                                          */
+/* ════════════════════════════════════════════════════════════ */
 .theme-toggle {
     display: flex;
     align-items: center;
@@ -154,7 +386,6 @@ body.light-theme .profile-btn:hover {
     line-height: 1;
 }
 
-/* For header buttons */
 .h-btn.theme-toggle {
     padding: 8px 12px;
     background: var(--card);
@@ -166,14 +397,21 @@ body.light-theme .profile-btn:hover {
     background: rgba(99, 102, 241, 0.1);
 }
 
-/* Light theme adjustments */
 body.light-theme .theme-toggle {
-    background: rgba(79, 70, 229, 0.08);
-    border-color: rgba(79, 70, 229, 0.2);
+    background: rgba(79, 70, 229, 0.06);
+    border-color: rgba(79, 70, 229, 0.18);
     color: var(--text);
 }
 
 body.light-theme .theme-toggle:hover {
-    background: rgba(79, 70, 229, 0.15);
-    border-color: rgba(79, 70, 229, 0.4);
+    background: rgba(79, 70, 229, 0.12);
+    border-color: rgba(79, 70, 229, 0.35);
+    color: var(--accent);
+}
+
+/* ════════════════════════════════════════════════════════════ */
+/* ANTI-FLASH: сховати body до завантаження теми               */
+/* ════════════════════════════════════════════════════════════ */
+body.theme-loading {
+    visibility: hidden;
 }

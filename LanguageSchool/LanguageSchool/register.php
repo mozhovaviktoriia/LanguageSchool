@@ -2,20 +2,28 @@
 session_start();
 require 'config.php';
 
-// Redirect if already logged in
+// Якщо залогінений НЕ як студент — скидаємо сесію і показуємо форму реєстрації
+// (реєстрація лише для нових учнів)
 if (isset($_SESSION['user_id'])) {
-    header("Location: dashboard_student.php");
-    exit;
+    session_unset();
+    session_destroy();
+    session_start();
 }
 
-// Load active courses for the dropdown
-$courses = $pdo->query("
-    SELECT c.id, c.title, c.level, c.price, l.name_ua
-    FROM courses c
-    JOIN languages l ON c.language_id = l.id
-    WHERE c.is_active = TRUE
-    ORDER BY l.name_ua, c.title
-")->fetchAll(PDO::FETCH_ASSOC);
+// Завантаження активних курсів
+$courses = [];
+try {
+    $stmt = $pdo->query("
+        SELECT c.id, c.title, c.level, c.price, l.name_ua
+        FROM courses c
+        JOIN languages l ON c.language_id = l.id
+        WHERE c.is_active = TRUE
+        ORDER BY l.name_ua, c.title
+    ");
+    $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $courses = [];
+}
 
 $message = '';
 $success = false;
@@ -26,9 +34,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone     = trim($_POST['phone']      ?? '');
     $email     = trim($_POST['email']      ?? '');
     $password  = trim($_POST['password']   ?? '');
-    $courseId  = (int)($_POST['course_id'] ?? 0);
+    $courseId  = trim($_POST['course_id']  ?? ''); // UUID — не int!
 
-    // Validation
     if (!$firstName || !$lastName || !$phone || !$email || !$password || !$courseId) {
         $message = 'Будь ласка, заповніть усі поля.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -36,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (mb_strlen($password) < 6) {
         $message = 'Пароль має бути не менше 6 символів.';
     } else {
-        // Check if email already exists
         $chk = $pdo->prepare("SELECT id FROM users WHERE email = :email");
         $chk->execute(['email' => $email]);
         if ($chk->fetch()) {
@@ -45,11 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $pdo->beginTransaction();
 
-                // Insert user with status 'inactive' — admin must approve
                 $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+                // RETURNING id — єдиний спосіб отримати UUID після INSERT у PostgreSQL
                 $stmt = $pdo->prepare("
                     INSERT INTO users (email, password_hash, first_name, last_name, phone, role, status)
                     VALUES (:email, :hash, :fn, :ln, :phone, 'student', 'inactive')
+                    RETURNING id
                 ");
                 $stmt->execute([
                     'email' => $email,
@@ -58,14 +66,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'ln'    => $lastName,
                     'phone' => $phone,
                 ]);
-                $userId = $pdo->lastInsertId();
+                $userId = $stmt->fetch(PDO::FETCH_ASSOC)['id'];
 
-                // Create enrollment with status 'pending', reset if already existed (rejected/old)
                 $enroll = $pdo->prepare("
                     INSERT INTO enrollments (student_id, course_id, status, enrolled_at)
-                    VALUES (:uid, :cid, 'pending', NOW())
-                    ON CONFLICT (student_id, course_id)
-                    DO UPDATE SET status = 'pending', enrolled_at = NOW()
+                    VALUES (:uid::uuid, :cid::uuid, 'pending', NOW())
+                    ON CONFLICT (student_id, course_id) DO UPDATE
+                        SET status = 'pending', enrolled_at = NOW()
                 ");
                 $enroll->execute(['uid' => $userId, 'cid' => $courseId]);
 
@@ -74,6 +81,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             } catch (PDOException $e) {
                 $pdo->rollBack();
+                // Розкоментуйте для діагностики:
+                // $message = 'DB Error: ' . $e->getMessage();
                 $message = 'Помилка реєстрації. Спробуйте ще раз.';
             }
         }
@@ -115,12 +124,7 @@ body {
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 
-.logo {
-    font-size: 22px;
-    font-weight: 800;
-    letter-spacing: -.5px;
-    margin-bottom: 6px;
-}
+.logo { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 6px; }
 .logo span { color: #a5f3fc; }
 
 .subtitle {
@@ -130,12 +134,7 @@ body {
     font-family: 'JetBrains Mono', monospace;
 }
 
-.row-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field { margin-bottom: 14px; }
 
 .field label {
@@ -169,6 +168,16 @@ body {
     background: rgba(255,255,255,0.15);
 }
 
+.field select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='rgba(255,255,255,0.6)' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+    cursor: pointer;
+}
+
 .field select option { background: #1e293b; color: #e2e8f0; }
 
 .divider {
@@ -187,6 +196,17 @@ body {
     flex: 1;
     height: 1px;
     background: rgba(255,255,255,0.25);
+}
+
+.no-courses {
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(251,191,36,.15);
+    border: 1px solid rgba(251,191,36,.4);
+    font-size: 13px;
+    color: #fde68a;
+    margin-bottom: 14px;
+    text-align: center;
 }
 
 .btn-submit {
@@ -208,6 +228,11 @@ body {
     transform: translateY(-2px);
     box-shadow: 0 12px 30px rgba(0,0,0,0.25);
 }
+.btn-submit:disabled {
+    opacity: .45;
+    cursor: not-allowed;
+    transform: none;
+}
 
 .msg {
     margin-top: 16px;
@@ -218,11 +243,10 @@ body {
     text-align: center;
 }
 .msg.error { background: rgba(239,68,68,.2); border: 1px solid rgba(239,68,68,.4); }
-.msg.success { background: rgba(34,211,153,.15); border: 1px solid rgba(34,211,153,.35); }
 
-.success-icon { font-size: 42px; text-align: center; margin-bottom: 14px; }
+.success-icon  { font-size: 42px; text-align: center; margin-bottom: 14px; }
 .success-title { font-size: 20px; font-weight: 800; text-align: center; margin-bottom: 10px; }
-.success-text { font-size: 13px; opacity: .8; text-align: center; line-height: 1.6; margin-bottom: 24px; }
+.success-text  { font-size: 13px; opacity: .8; text-align: center; line-height: 1.6; margin-bottom: 24px; }
 
 .links {
     display: flex;
@@ -239,11 +263,10 @@ body {
 </style>
 </head>
 <body>
-
 <div class="box">
 
 <?php if ($success): ?>
-    <!-- Success screen -->
+
     <div class="success-icon">🎉</div>
     <div class="success-title">Заявку подано!</div>
     <div class="success-text">
@@ -297,21 +320,29 @@ body {
 
         <div class="divider">Обрати курс</div>
 
+        <?php if (empty($courses)): ?>
+            <div class="no-courses">
+                ⚠️ Наразі немає доступних курсів. Зверніться до адміністратора.
+            </div>
+        <?php else: ?>
         <div class="field">
             <label>Курс, який вас цікавить</label>
             <select name="course_id" required>
                 <option value="">— Оберіть курс —</option>
                 <?php foreach ($courses as $c): ?>
-                <option value="<?= $c['id'] ?>"
-                    <?= (isset($_POST['course_id']) && $_POST['course_id'] == $c['id']) ? 'selected' : '' ?>>
+                <option value="<?= htmlspecialchars($c['id']) ?>"
+                    <?= (isset($_POST['course_id']) && $_POST['course_id'] === (string)$c['id']) ? 'selected' : '' ?>>
                     <?= htmlspecialchars($c['name_ua']) ?> — <?= htmlspecialchars($c['title']) ?>
-                    (<?= htmlspecialchars($c['level']) ?>, <?= $c['price'] ?> грн)
+                    (<?= htmlspecialchars($c['level']) ?>, <?= htmlspecialchars((string)$c['price']) ?> грн)
                 </option>
                 <?php endforeach; ?>
             </select>
         </div>
+        <?php endif; ?>
 
-        <button type="submit" class="btn-submit">Подати заявку</button>
+        <button type="submit" class="btn-submit" <?= empty($courses) ? 'disabled' : '' ?>>
+            Подати заявку
+        </button>
 
         <?php if ($message): ?>
             <div class="msg error"><?= htmlspecialchars($message) ?></div>
@@ -327,7 +358,6 @@ body {
 <?php endif; ?>
 
 </div>
-
 <script src="theme-switcher.js"></script>
 </body>
 </html>

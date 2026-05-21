@@ -1,100 +1,94 @@
 // ════════════════════════════════════════════════════════════
-// Theme Switcher
+// Theme Switcher — виправлена версія без мерехтіння
 // ════════════════════════════════════════════════════════════
 
-class ThemeSwitcher {
-    constructor() {
-        this.THEME_KEY = 'app-theme-preference';
-        this.DARK_THEME = 'dark';
-        this.LIGHT_THEME = 'light';
-        this.init();
+(function () {
+    var THEME_KEY = 'app-theme-preference';
+
+    // Зчитуємо збережену тему одразу — до рендеру сторінки
+    function getSavedTheme() {
+        var saved = localStorage.getItem(THEME_KEY);
+        if (saved) return saved;
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            return 'dark';
+        }
+        return 'dark'; // default
     }
 
-    init() {
-        // Load saved theme preference or use system preference
-        const savedTheme = this.getSavedTheme();
-        this.setTheme(savedTheme);
-        
-        // Listen for theme toggle button clicks
-        document.addEventListener('click', (e) => {
+    // Застосовуємо тему до body і html миттєво
+    function applyTheme(theme) {
+        if (theme === 'light') {
+            document.documentElement.classList.add('light-theme');
+            document.body.classList.add('light-theme');
+            document.documentElement.classList.remove('dark-theme');
+            document.body.classList.remove('dark-theme');
+        } else {
+            document.documentElement.classList.remove('light-theme');
+            document.body.classList.remove('light-theme');
+            document.documentElement.classList.add('dark-theme');
+            document.body.classList.add('dark-theme');
+        }
+        localStorage.setItem(THEME_KEY, theme);
+    }
+
+    // Ранній запуск — до DOMContentLoaded — щоб уникнути flash
+    // Для цього додаємо клас light-theme одразу на <html>
+    var earlyTheme = getSavedTheme();
+    if (earlyTheme === 'light') {
+        document.documentElement.classList.add('light-theme');
+    }
+
+    // Повна ініціалізація після завантаження DOM
+    function init() {
+        // Знімаємо блокування видимості якщо було
+        document.body.classList.remove('theme-loading');
+
+        // Застосовуємо тему на body
+        applyTheme(earlyTheme);
+
+        // Оновлюємо іконку кнопки
+        updateToggleButtons();
+
+        // Слухаємо кліки на всіх кнопках перемикання
+        document.addEventListener('click', function (e) {
             if (e.target.closest('.theme-toggle')) {
-                this.toggleTheme();
+                var current = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+                var next = current === 'dark' ? 'light' : 'dark';
+                applyTheme(next);
+                updateToggleButtons();
             }
         });
 
-        // Listen for system theme changes
+        // Слухаємо зміни системної теми
         if (window.matchMedia) {
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                if (!localStorage.getItem(this.THEME_KEY)) {
-                    this.setTheme(e.matches ? this.DARK_THEME : this.LIGHT_THEME);
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function (e) {
+                if (!localStorage.getItem(THEME_KEY)) {
+                    applyTheme(e.matches ? 'dark' : 'light');
+                    updateToggleButtons();
                 }
             });
         }
     }
 
-    getSavedTheme() {
-        const saved = localStorage.getItem(this.THEME_KEY);
-        if (saved) {
-            return saved;
-        }
-
-        // Use system preference if available
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return this.DARK_THEME;
-        }
-
-        return this.DARK_THEME; // Default to dark theme
+    function updateToggleButtons() {
+        var isLight = document.body.classList.contains('light-theme');
+        document.querySelectorAll('.theme-toggle').forEach(function (btn) {
+            var icon = btn.querySelector('.theme-toggle-icon');
+            var text = btn.querySelector('.theme-toggle-text');
+            if (icon) {
+                icon.textContent = isLight ? '🌙' : '☀️';
+            }
+            if (text) {
+                text.textContent = isLight ? 'Темна тема' : 'Світла тема';
+            }
+            btn.setAttribute('title', isLight ? 'Перемкнути на темну тему' : 'Перемкнути на світлу тему');
+        });
     }
 
-    setTheme(theme) {
-        if (theme === this.LIGHT_THEME) {
-            document.documentElement.classList.add('light-theme');
-            document.body.classList.add('light-theme');
-        } else {
-            document.documentElement.classList.remove('light-theme');
-            document.body.classList.remove('light-theme');
-        }
-
-        // Save preference
-        localStorage.setItem(this.THEME_KEY, theme);
-
-        // Update toggle button icon if exists
-        this.updateToggleButton();
+    // Запускаємо після DOMContentLoaded
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
     }
-
-    toggleTheme() {
-        const current = this.getCurrentTheme();
-        const newTheme = current === this.DARK_THEME ? this.LIGHT_THEME : this.DARK_THEME;
-        this.setTheme(newTheme);
-    }
-
-    getCurrentTheme() {
-        return document.body.classList.contains('light-theme') ? this.LIGHT_THEME : this.DARK_THEME;
-    }
-
-    updateToggleButton() {
-        const toggleBtn = document.querySelector('.theme-toggle');
-        if (!toggleBtn) return;
-
-        const icon = toggleBtn.querySelector('.theme-toggle-icon');
-        const text = toggleBtn.querySelector('.theme-toggle-text');
-        const currentTheme = this.getCurrentTheme();
-
-        if (currentTheme === this.LIGHT_THEME) {
-            icon.textContent = '🌙';
-            if (text) text.textContent = 'Темна тема';
-        } else {
-            icon.textContent = '☀️';
-            if (text) text.textContent = 'Світла тема';
-        }
-    }
-}
-
-// Initialize on page load
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        new ThemeSwitcher();
-    });
-} else {
-    new ThemeSwitcher();
-}
+})();
