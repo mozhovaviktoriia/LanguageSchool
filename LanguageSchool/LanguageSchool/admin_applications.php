@@ -11,48 +11,116 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['app_id'])) {
     $appId  = $_POST['app_id'];
     $action = $_POST['action'];
+    $source = $_POST['source'] ?? 'application';
 
-    if ($action === 'approve') {
-        $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = :id")
-            ->execute(['id' => $appId]);
-        $flash = ['type' => 'success', 'text' => 'Заявку підтверджено.'];
+    if ($source === 'enrollment') {
+        // Заявки з register.php — enrollments + users
+        $realId = preg_replace('/^enr_/', '', $appId);
 
-    } elseif ($action === 'reject') {
-        $pdo->prepare("UPDATE applications SET status = 'rejected' WHERE id = :id")
-            ->execute(['id' => $appId]);
-        $flash = ['type' => 'warn', 'text' => 'Заявку відхилено.'];
+        if ($action === 'approve') {
+            // Активуємо enrollment
+            $pdo->prepare("UPDATE enrollments SET status = 'active' WHERE id = :id")
+                ->execute(['id' => $realId]);
+            // Знаходимо student_id і активуємо юзера
+            $enr = $pdo->prepare("SELECT student_id FROM enrollments WHERE id = :id");
+            $enr->execute(['id' => $realId]);
+            $studentId = $enr->fetchColumn();
+            if ($studentId) {
+                $pdo->prepare("UPDATE users SET status = 'active' WHERE id = :id")
+                    ->execute(['id' => $studentId]);
+            }
+            $_SESSION['flash'] = ['type' => 'success', 'text' => 'Студента активовано! Тепер він може увійти в систему.'];
 
-    } elseif ($action === 'delete') {
-        $pdo->prepare("DELETE FROM applications WHERE id = :id")
-            ->execute(['id' => $appId]);
-        $flash = ['type' => 'info', 'text' => 'Заявку видалено.'];
+        } elseif ($action === 'reject') {
+            $pdo->prepare("UPDATE enrollments SET status = 'rejected' WHERE id = :id")
+                ->execute(['id' => $realId]);
+            $_SESSION['flash'] = ['type' => 'warn', 'text' => 'Заявку відхилено.'];
+
+        } elseif ($action === 'delete') {
+            $enr = $pdo->prepare("SELECT student_id FROM enrollments WHERE id = :id");
+            $enr->execute(['id' => $realId]);
+            $studentId = $enr->fetchColumn();
+            $pdo->prepare("DELETE FROM enrollments WHERE id = :id")->execute(['id' => $realId]);
+            if ($studentId) {
+                // Видаляємо юзера лише якщо він ще неактивний і без інших enrollments
+                $otherEnr = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = :sid");
+                $otherEnr->execute(['sid' => $studentId]);
+                if ($otherEnr->fetchColumn() == 0) {
+                    $pdo->prepare("DELETE FROM users WHERE id = :id AND status = 'inactive'")
+                        ->execute(['id' => $studentId]);
+                }
+            }
+            $_SESSION['flash'] = ['type' => 'info', 'text' => 'Заявку видалено.'];
+        }
+
+    } else {
+        // Стара логіка — таблиця applications
+        $realId = preg_replace('/^app_/', '', $appId);
+
+        if ($action === 'approve') {
+            $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = :id")
+                ->execute(['id' => $realId]);
+            $_SESSION['flash'] = ['type' => 'success', 'text' => 'Заявку підтверджено.'];
+
+        } elseif ($action === 'reject') {
+            $pdo->prepare("UPDATE applications SET status = 'rejected' WHERE id = :id")
+                ->execute(['id' => $realId]);
+            $_SESSION['flash'] = ['type' => 'warn', 'text' => 'Заявку відхилено.'];
+
+        } elseif ($action === 'delete') {
+            $pdo->prepare("DELETE FROM applications WHERE id = :id")
+                ->execute(['id' => $realId]);
+            $_SESSION['flash'] = ['type' => 'info', 'text' => 'Заявку видалено.'];
+        }
     }
 
     header("Location: admin_applications.php");
     exit;
 }
 
-// Load all applications, newest first
+// Завантажуємо ВСІ заявки — з обох таблиць
 $apps = $pdo->query("
-    SELECT
-        a.id,
-        a.name,
-        a.phone,
-        a.status,
-        a.created_at,
-        c.title     AS course_title,
-        c.level,
-        c.price,
-        l.name_ua   AS language
-    FROM applications a
-    LEFT JOIN courses   c ON a.course_id   = c.id
-    LEFT JOIN languages l ON c.language_id = l.id
-    ORDER BY
-        CASE a.status WHEN 'new' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
-        a.created_at DESC
-")->fetchAll(PDO::FETCH_ASSOC);
+    SELECT * FROM (
+        SELECT
+            'app_' || a.id::text   AS id,
+            a.name                 AS display_name,
+            NULL                   AS email,
+            a.phone,
+            a.status,
+            a.created_at,
+            c.title                AS course_title,
+            c.level,
+            c.price,
+            l.name_ua              AS language,
+            'application'          AS source
+        FROM applications a
+        LEFT JOIN courses   c ON a.course_id   = c.id
+        LEFT JOIN languages l ON c.language_id = l.id
 
-$newCount = count(array_filter($apps, fn($a) => $a['status'] === 'new'));
+        UNION ALL
+
+        SELECT
+            'enr_' || e.id::text   AS id,
+            u.first_name || ' ' || u.last_name AS display_name,
+            u.email,
+            u.phone,
+            'new'                  AS status,
+            e.enrolled_at          AS created_at,
+            c.title                AS course_title,
+            c.level,
+            c.price,
+            l.name_ua              AS language,
+            'enrollment'           AS source
+        FROM enrollments e
+        JOIN users     u ON e.student_id   = u.id
+        JOIN courses   c ON e.course_id    = c.id
+        JOIN languages l ON c.language_id  = l.id
+        WHERE e.status = 'pending' AND u.status = 'inactive'
+    ) AS combined
+    ORDER BY
+        CASE status WHEN 'new' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+        created_at DESC
+")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="uk">
@@ -164,13 +232,19 @@ header {
 }
 .app-card:hover { border-color: rgba(99,102,241,.45); box-shadow: 0 6px 20px rgba(99,102,241,.1); }
 
-/* Card top */
-.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+/* Бейдж джерела */
+.source-badge {
+    font-family: var(--mono); font-size: 9px; font-weight: 600;
+    padding: 2px 7px; border-radius: 5px; display: inline-block; margin-bottom: 6px;
+}
+.source-enrollment { background: rgba(34,211,238,.1); color: var(--teal); border: 1px solid rgba(34,211,238,.2); }
+.source-application { background: rgba(99,102,241,.1); color: #a5b4fc; border: 1px solid rgba(99,102,241,.2); }
 
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .applicant-name { font-size: 16px; font-weight: 800; }
-.applicant-phone {
-    font-family: var(--mono); font-size: 12px;
-    color: var(--teal); margin-top: 4px;
+.applicant-sub {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--teal); margin-top: 3px;
 }
 
 .status-badge {
@@ -181,7 +255,6 @@ header {
 .badge-approved { background: rgba(34,197,94,.12);  color: var(--green); border: 1px solid rgba(34,197,94,.25); }
 .badge-rejected { background: rgba(100,116,139,.1); color: var(--muted); border: 1px solid var(--border); }
 
-/* Course box */
 .course-box {
     background: rgba(255,255,255,.03);
     border: 1px solid var(--border);
@@ -201,13 +274,8 @@ header {
 .tag-level { color: var(--amber); background: rgba(245,158,11,.08); border-color: rgba(245,158,11,.2); }
 .tag-price { color: var(--green); background: rgba(34,197,94,.08);  border-color: rgba(34,197,94,.2); }
 
-/* Date */
-.card-date {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--muted);
-}
+.card-date { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 
-/* Actions */
 .card-actions { display: flex; gap: 8px; }
 .btn {
     height: 36px; border-radius: 9px;
@@ -234,7 +302,6 @@ header {
 }
 .btn-delete:hover { background: rgba(239,68,68,.18); }
 
-/* Empty */
 .empty {
     text-align: center; padding: 56px 40px;
     background: var(--card); border: 1px dashed var(--border);
@@ -259,16 +326,19 @@ header {
 
 <div class="wrap">
 
-    <?php if (isset($flash)): ?>
+    <?php 
+    $flash = $_SESSION['flash'] ?? null;
+    if ($flash) unset($_SESSION['flash']);
+    if ($flash): ?>
     <div class="flash <?= $flash['type'] ?>"><?= htmlspecialchars($flash['text']) ?></div>
     <?php endif; ?>
 
-    <!-- Stats -->
     <?php
     $cntNew      = count(array_filter($apps, fn($a) => $a['status'] === 'new'));
     $cntApproved = count(array_filter($apps, fn($a) => $a['status'] === 'approved'));
     $cntRejected = count(array_filter($apps, fn($a) => $a['status'] === 'rejected'));
     ?>
+
     <div class="stats">
         <div class="stat-card stat-new">
             <div class="stat-val"><?= $cntNew ?></div>
@@ -284,7 +354,7 @@ header {
         </div>
     </div>
 
-    <!-- New applications -->
+    <!-- Нові заявки -->
     <div class="sec-head">
         <div class="sec-title">Нові заявки</div>
         <?php if ($cntNew > 0): ?>
@@ -304,10 +374,23 @@ header {
     <div class="grid">
     <?php foreach ($newApps as $a): ?>
         <div class="app-card is-new">
+
+            <!-- Тип заявки -->
+            <?php if ($a['source'] === 'enrollment'): ?>
+                <span class="source-badge source-enrollment">📋 Реєстрація на сайті</span>
+            <?php else: ?>
+                <span class="source-badge source-application">📝 Форма заявки</span>
+            <?php endif; ?>
+
             <div class="card-top">
                 <div>
-                    <div class="applicant-name"><?= htmlspecialchars($a['name']) ?></div>
-                    <div class="applicant-phone"><?= htmlspecialchars($a['phone']) ?></div>
+                    <div class="applicant-name"><?= htmlspecialchars($a['display_name']) ?></div>
+                    <?php if (!empty($a['email'])): ?>
+                        <div class="applicant-sub">✉ <?= htmlspecialchars($a['email']) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($a['phone'])): ?>
+                        <div class="applicant-sub">📞 <?= htmlspecialchars($a['phone']) ?></div>
+                    <?php endif; ?>
                 </div>
                 <span class="status-badge badge-new">Нова</span>
             </div>
@@ -327,7 +410,8 @@ header {
 
             <div class="card-actions">
                 <form method="POST" style="display:contents;">
-                    <input type="hidden" name="app_id" value="<?= $a['id'] ?>">
+                    <input type="hidden" name="app_id" value="<?= htmlspecialchars($a['id']) ?>">
+                    <input type="hidden" name="source" value="<?= htmlspecialchars($a['source']) ?>">
                     <button name="action" value="approve" class="btn btn-approve">✓ Підтвердити</button>
                     <button name="action" value="reject"  class="btn btn-reject">Відхилити</button>
                     <button name="action" value="delete"  class="btn btn-delete"
@@ -339,7 +423,7 @@ header {
     </div>
     <?php endif; ?>
 
-    <!-- Processed applications -->
+    <!-- Опрацьовані заявки -->
     <?php $doneApps = array_filter($apps, fn($a) => $a['status'] !== 'new'); ?>
     <?php if (!empty($doneApps)): ?>
     <div class="sec-head">
@@ -349,10 +433,22 @@ header {
     <div class="grid">
     <?php foreach ($doneApps as $a): ?>
         <div class="app-card">
+
+            <?php if ($a['source'] === 'enrollment'): ?>
+                <span class="source-badge source-enrollment">📋 Реєстрація на сайті</span>
+            <?php else: ?>
+                <span class="source-badge source-application">📝 Форма заявки</span>
+            <?php endif; ?>
+
             <div class="card-top">
                 <div>
-                    <div class="applicant-name"><?= htmlspecialchars($a['name']) ?></div>
-                    <div class="applicant-phone"><?= htmlspecialchars($a['phone']) ?></div>
+                    <div class="applicant-name"><?= htmlspecialchars($a['display_name']) ?></div>
+                    <?php if (!empty($a['email'])): ?>
+                        <div class="applicant-sub">✉ <?= htmlspecialchars($a['email']) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($a['phone'])): ?>
+                        <div class="applicant-sub">📞 <?= htmlspecialchars($a['phone']) ?></div>
+                    <?php endif; ?>
                 </div>
                 <?php if ($a['status'] === 'approved'): ?>
                     <span class="status-badge badge-approved">✓ Підтверджено</span>
@@ -376,7 +472,8 @@ header {
 
             <div class="card-actions">
                 <form method="POST" style="display:contents;">
-                    <input type="hidden" name="app_id" value="<?= $a['id'] ?>">
+                    <input type="hidden" name="app_id" value="<?= htmlspecialchars($a['id']) ?>">
+                    <input type="hidden" name="source" value="<?= htmlspecialchars($a['source']) ?>">
                     <button name="action" value="delete" class="btn btn-delete"
                             style="width:100%;"
                             onclick="return confirm('Видалити заявку?')">🗑 Видалити</button>

@@ -41,6 +41,31 @@ if (isset($_GET['delete_course'])) {
     header("Location: admin.php"); exit;
 }
 
+// Generate temporary password and show as HTML for admin to copy
+if (isset($_GET['view_credentials'])) {
+    $uid = $_GET['view_credentials'];
+    $user = $pdo->prepare("SELECT id, first_name, last_name, email FROM users WHERE id = :id");
+    $user->execute(['id' => $uid]);
+    $userData = $user->fetch(PDO::FETCH_ASSOC);
+    
+    if ($userData && $userData['email']) {
+        $tempPassword = bin2hex(random_bytes(6));
+        $passwordHash = password_hash($tempPassword, PASSWORD_BCRYPT);
+        
+        $pdo->prepare("UPDATE users SET password_hash = :ph WHERE id = :id")
+            ->execute(['ph' => $passwordHash, 'id' => $uid]);
+        
+        $_SESSION['temp_creds'] = [
+            'email'     => $userData['email'],
+            'firstName' => $userData['first_name'],
+            'lastName'  => $userData['last_name'],
+            'password'  => $tempPassword
+        ];
+    }
+    header("Location: admin.php#creds-modal");
+    exit;
+}
+
 // Filter courses by language
 $languageFilter = $_GET['language'] ?? '';
 $languages = $pdo->query("SELECT id, name_ua FROM languages ORDER BY name_ua")->fetchAll(PDO::FETCH_ASSOC);
@@ -69,11 +94,10 @@ $students = $pdo->query("
     FROM users u
     LEFT JOIN enrollments e ON e.student_id = u.id AND e.status = 'active'
     LEFT JOIN courses c ON e.course_id = c.id
-    WHERE u.role = 'student'
+    WHERE u.role = 'student' AND u.status != 'banned'
     GROUP BY u.id, u.first_name, u.last_name, u.email, u.status
-    ORDER BY u.last_name, u.first_name
+    ORDER BY u.status DESC, u.last_name, u.first_name
 ")->fetchAll(PDO::FETCH_ASSOC);
-
 // Fetch teachers with their courses and languages
 $teachers = $pdo->query("
     SELECT u.id, u.first_name, u.last_name, u.email, u.status,
@@ -184,7 +208,7 @@ tbody td { padding:13px 18px; vertical-align:middle; }
 .s-banned   { color:var(--danger); }
 
 .tbl-actions { display:flex; gap:6px; flex-wrap:wrap; }
-.tbl-edit, .tbl-del, .tbl-block, .tbl-unblock, .tbl-chat {
+.tbl-edit, .tbl-del, .tbl-block, .tbl-unblock, .tbl-chat, .tbl-send {
     padding:5px 10px; border-radius:6px; font-size:11px; font-family:var(--mono); font-weight:600; text-decoration:none; transition:.15s; white-space:nowrap;
 }
 .tbl-edit    { background:rgba(59,130,246,.12); color:#93c5fd; }
@@ -192,14 +216,18 @@ tbody td { padding:13px 18px; vertical-align:middle; }
 .tbl-block   { background:rgba(245,158,11,.1); color:#fcd34d; }
 .tbl-unblock { background:rgba(34,197,94,.1); color:#86efac; }
 
-/* ── НОВЕ: кнопка "Написати" у таблиці ── */
+/* ── НОВЕ: кнопка "Написати" і "Відправити доступи" у таблиці ── */
 .tbl-chat    { background:rgba(34,211,238,.08); color:var(--accent2); border:1px solid rgba(34,211,238,.2); }
 .tbl-chat:hover { background:rgba(34,211,238,.2); border-color:var(--accent2); color:#fff; }
+
+.tbl-send    { background:rgba(99,102,241,.1); color:#a5b4fc; border:1px solid rgba(99,102,241,.25); }
+.tbl-send:hover { background:rgba(99,102,241,.25); border-color:#a5b4fc; color:#fff; }
 
 .tbl-edit:hover    { background:rgba(59,130,246,.28); }
 .tbl-del:hover     { background:rgba(239,68,68,.25); }
 .tbl-block:hover   { background:rgba(245,158,11,.25); }
 .tbl-unblock:hover { background:rgba(34,197,94,.25); }
+
 
 .empty { text-align:center; font-family:var(--mono); font-size:13px; color:var(--muted); padding:48px 20px; }
 .divider { height:1px; background:linear-gradient(90deg,transparent,var(--border),transparent); }
@@ -218,6 +246,18 @@ tbody td { padding:13px 18px; vertical-align:middle; }
 .modal-confirm:hover { background:rgba(239,68,68,.3); color:#fff; }
 
 @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── FLASH MESSAGES ── */
+.flash {
+    padding: 13px 18px; border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 10px;
+    animation: fadeUp .3s ease-out;
+}
+.flash.success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3); color: var(--success); }
+.flash.warn    { background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.3); color: var(--warn); }
+.flash.info    { background: rgba(99,102,241,.10); border: 1px solid rgba(99,102,241,.3); color: #a5b4fc; }
 </style>
 </head>
 <body>
@@ -232,6 +272,64 @@ tbody td { padding:13px 18px; vertical-align:middle; }
             <button class="modal-cancel" onclick="closeModal()">Скасувати</button>
             <a class="modal-confirm" id="modalLink" href="#">Підтвердити</a>
         </div>
+    </div>
+</div>
+
+<!-- Модальне вікно з листом для відправки -->
+<div class="modal-overlay <?= isset($_SESSION['temp_creds']) ? 'open' : '' ?>" id="credsModal">
+    <div class="modal-box" style="max-width:520px;text-align:left;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+            <div style="font-size:17px;font-weight:800;">📋 Лист для учня</div>
+            <button onclick="closeCredsModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;">✕</button>
+        </div>
+
+       <?php if (isset($_SESSION['temp_creds'])): $c = $_SESSION['temp_creds']; unset($_SESSION['temp_creds']);
+$gmailSubject = rawurlencode("LinguaSchool — Ваші дані для входу");
+$gmailBody = rawurlencode("Привіт, {$c['firstName']}!\n\nВас додано до платформи LinguaSchool.\nВаші дані для входу:\n\nЛогін (Email): {$c['email']}\nТимчасовий пароль: {$c['password']}\n\nПосилання: http://localhost:3000/LanguageSchool/LanguageSchool/login.php\n\nПісля першого входу змініть пароль.\n\nЗ повагою,\nАдміністрація LinguaSchool");
+?>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Кому:</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:13px;color:var(--accent2);margin-bottom:16px;">
+            <?= htmlspecialchars($c['email']) ?>
+        </div>
+
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Тема:</div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:13px;margin-bottom:16px;">
+            LinguaSchool — Ваші дані для входу
+        </div>
+
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;">Текст листа:</div>
+        <textarea id="credsText" readonly style="width:100%;height:220px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:var(--mono);font-size:12px;color:var(--text);resize:none;line-height:1.6;">Привіт, <?= htmlspecialchars($c['firstName']) ?>!
+
+Вас додано до платформи LinguaSchool.
+Ваші дані для входу:
+
+📧 Логін (Email): <?= htmlspecialchars($c['email']) ?>
+
+🔐 Тимчасовий пароль: <?= htmlspecialchars($c['password']) ?>
+
+Посилання для входу:
+http://localhost:3000/LanguageSchool/LanguageSchool/login.php
+
+⚠️ Важливо: після першого входу змініть пароль в особистому кабінеті.
+
+З повагою,
+Адміністрація LinguaSchool</textarea>
+
+        <div style="display:flex;gap:10px;margin-top:16px;">
+    <button onclick="copyCredsTxt()" style="flex:1;padding:10px;border-radius:10px;background:rgba(99,102,241,.15);color:#a5b4fc;border:1px solid rgba(99,102,241,.3);font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;">
+        📋 Копіювати текст
+    </button>
+    <a href="https://mail.google.com/mail/?view=cm&to=<?= rawurlencode($c['email']) ?>&su=<?= $gmailSubject ?>&body=<?= $gmailBody ?>"
+       target="_blank"
+       style="flex:1;padding:10px;border-radius:10px;background:rgba(34,211,238,.1);color:var(--accent2);border:1px solid rgba(34,211,238,.3);font-family:var(--mono);font-size:12px;font-weight:600;cursor:pointer;text-align:center;text-decoration:none;">
+        ✉️ Відкрити у Gmail
+    </a>
+</div>
+        <div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--muted);text-align:center;">
+            Скопіюйте текст або натисніть «Відкрити у пошті» щоб надіслати через вашу поштову програму
+        </div>
+
+        <?php endif; ?>
     </div>
 </div>
 
@@ -254,6 +352,15 @@ tbody td { padding:13px 18px; vertical-align:middle; }
 </header>
 
 <div class="wrap">
+
+<?php 
+// Display flash message if exists
+if (isset($_SESSION['flash'])) {
+    $flash = $_SESSION['flash'];
+    unset($_SESSION['flash']);
+?>
+    <div class="flash <?= $flash['type'] ?>"><?= htmlspecialchars($flash['text']) ?></div>
+<?php } ?>
 
 <!-- ══ КУРСИ ══ -->
 <section>
@@ -317,14 +424,15 @@ tbody td { padding:13px 18px; vertical-align:middle; }
     <span class="sec-count"><?= count($students) ?></span>
 
     <?php
-    $pendingEnroll = $pdo->query("SELECT COUNT(*) FROM enrollments WHERE status = 'pending'")->fetchColumn();
+    $pendingEnroll = $pdo->query("SELECT COUNT(*) FROM enrollments WHERE status = 'pending' AND student_id IN (SELECT id FROM users WHERE status = 'inactive')")->fetchColumn();
     $pendingApps   = $pdo->query("SELECT COUNT(*) FROM applications WHERE status = 'new'")->fetchColumn();
+    $totalPending  = $pendingEnroll + $pendingApps;
     ?>
 
     <!-- Заявки через apply.php (без реєстрації) -->
-    <a class="h-btn<?= $pendingApps > 0 ? ' chat' : '' ?>" href="admin_applications.php"
-       style="<?= $pendingApps > 0 ? '' : 'color:var(--muted)' ?>">
-        Заявки<?= $pendingApps > 0 ? " ({$pendingApps})" : '' ?>
+    <a class="h-btn<?= $totalPending > 0 ? ' chat' : '' ?>" href="admin_applications.php"
+       style="<?= $totalPending > 0 ? '' : 'color:var(--muted)' ?>">
+        Заявки<?= $totalPending > 0 ? " ({$totalPending})" : '' ?>
     </a>
 
     <a class="plus-btn" href="admin_users.php?role=student" title="Додати студента">+</a>
@@ -372,12 +480,12 @@ tbody td { padding:13px 18px; vertical-align:middle; }
                         <a class="tbl-edit" href="admin_users.php?id=<?= $u['id'] ?>">Редагувати</a>
                         <!-- НОВЕ: кнопка "Написати" — відкриває чат з цим студентом -->
                            <?php if ($u['status'] === 'inactive'): ?>
-                        <a class="tbl-edit" href="admin_enrollments.php" 
+                        <a class="tbl-edit" href="admin_applications.php" 
                         style="color:var(--amber);background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.25);">
                             ⏳ Заявка
                         </a>
                         <?php endif; ?>
-                        <a class="tbl-chat" href="chat.php?open_user=<?= $u['id'] ?>">💬 Написати</a>
+<a class="tbl-send" href="?view_credentials=<?= $u['id'] ?>" title="Генерувати лист з логіном та паролем">Лист</a>                        <a class="tbl-chat" href="chat.php?open_user=<?= $u['id'] ?>">💬 Написати</a>
                         <?php if ($isBanned): ?>
                         <a class="tbl-unblock" href="?toggle_user=<?= $u['id'] ?>">Розблокувати</a>
                         <?php else: ?>
@@ -489,6 +597,22 @@ function closeModal() {
 }
 document.getElementById('confirmModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
+});
+</script>
+<script>
+function closeCredsModal() {
+    document.getElementById('credsModal').classList.remove('open');
+}
+function copyCredsTxt() {
+    const ta = document.getElementById('credsText');
+    ta.select();
+    document.execCommand('copy');
+    const btn = event.target;
+    btn.textContent = '✅ Скопійовано!';
+    setTimeout(() => btn.textContent = '📋 Копіювати текст', 2000);
+}
+document.getElementById('credsModal').addEventListener('click', function(e) {
+    if (e.target === this) closeCredsModal();
 });
 </script>
 <script src="theme-switcher.js"></script>

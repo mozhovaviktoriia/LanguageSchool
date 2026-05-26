@@ -1,0 +1,174 @@
+
+[2026-05-25 21:59:03]
+TO: vesnyshh@gmail.com
+SUBJECT: LinguaSchool — Доступ до платформи
+MESSAGE: 
+    <html>
+        <head>
+            <meta charset='UTF-8'>
+            <style>
+                body { font-family: Arial, sans-serif; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; border-radius: 10px; }
+                .header { text-align: center; padding-bottom: 20px; }
+                .logo { font-size: 24px; font-weight: bold; color: #6366f1; }
+                .content { background: white; padding: 30px; border-radius: 8px; }
+                .greeting { font-size: 18px; margin-bottom: 20px; font-weight: bold; }
+                .credentials { background: #f0f4ff; padding: 20px; border-radius: 6px; margin: 20px 0; }
+                .credentials p { margin: 12px 0; font-size: 14px; }
+                .label { font-weight: bold; color: #6366f1; display: block; margin-bottom: 5px; }
+                .value { font-family: 'Courier New', monospace; background: white; padding: 12px; border-radius: 4px; margin-top: 3px; border: 2px solid #6366f1; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+                .important { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; border-radius: 4px; }
+                .important p { margin: 8px 0; font-size: 14px; }
+                .step { margin: 15px 0; padding: 12px; background: #f9f9f9; border-left: 3px solid #6366f1; }
+                .step-title { font-weight: bold; color: #6366f1; }
+                .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; padding-top: 20px; border-top: 1px solid #eee; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <div class='logo'>Lingua<span style='color: #22d3ee;'>School</span></div>
+                </div>
+                
+                <div class='content'>
+                    <div class='greeting'>Привіт, Vicky! 👋</div>
+                    
+                    <p>Вас додано до платформи LinguaSchool. Нижче наведені дані для входу:</p>
+                    
+                    <div class='credentials'>
+                        <label class='label'>📧 Логін (Email):</label>
+                        <div class='value'>vesnyshh@gmail.com</div>
+                        
+                        <label class='label' style='margin-top: 15px;'>🔐 Тимчасовий пароль:</label>
+                        <div class='value'>2684f6160922</div>
+                    </div>
+                    
+                    <div class='important'>
+                        <p><strong>⚠️ Важливо:</strong></p>
+                        <p>• Це <strong>тимчасовий пароль</strong>, створений адміністратором</p>
+                        <p>• При першому вході ви матимете можливість змінити його на власний надійний пароль</p>
+                        <p>• Збережіть цей пароль у безпечному місці</p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 1️⃣ Вхід на платформу</p>
+                        <p>Перейдіть за посиланням:</p>
+                        <p style='margin: 10px 0; word-break: break-all;'>
+                            <a href='http://localhost:3000/LanguageSchool/LanguageSchool/login.php' 
+                               style='color: #6366f1; text-decoration: none; font-weight: bold;'>
+                                http://localhost:3000/LanguageSchool/LanguageSchool/login.php
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 2️⃣ Введіть дані</p>
+                        <p>• <strong>Email:</strong> vesnyshh@gmail.com</p>
+                        <p>• <strong>Пароль:</strong> 2684f6160922</p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 3️⃣ Змініть пароль</p>
+                        <p>Після входу перейдіть в особистий кабінет та змініть пароль на свій власний. Використовуйте надійний пароль, який містить букви, цифри та спеціальні символи.</p>
+                    </div>
+                    
+                    <p style='margin-top: 20px; font-size: 14px;'>Якщо у вас виникли запитання або проблеми, зверніться до адміністратора школи.</p>
+                </div>
+                
+                <div class='footer'>
+                    <p>© 2025 LinguaSchool. Усі права захищені.</p>
+                    <p>Це автоматично згенероване повідомлення, будь ласка, не відповідайте на нього.</p>
+                </div>
+            </div>
+        </body>
+    </html>
+    
+---
+
+
+[2026-05-25 22:04:04]
+TO: vesnyshh@gmail.com
+SUBJECT: LinguaSchool — Доступ до платформи
+MESSAGE: 
+    <html>
+        <head>
+            <meta charset='UTF-8'>
+            <style>
+                body { font-family: Arial, sans-serif; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; border-radius: 10px; }
+                .header { text-align: center; padding-bottom: 20px; }
+                .logo { font-size: 24px; font-weight: bold; color: #6366f1; }
+                .content { background: white; padding: 30px; border-radius: 8px; }
+                .greeting { font-size: 18px; margin-bottom: 20px; font-weight: bold; }
+                .credentials { background: #f0f4ff; padding: 20px; border-radius: 6px; margin: 20px 0; }
+                .credentials p { margin: 12px 0; font-size: 14px; }
+                .label { font-weight: bold; color: #6366f1; display: block; margin-bottom: 5px; }
+                .value { font-family: 'Courier New', monospace; background: white; padding: 12px; border-radius: 4px; margin-top: 3px; border: 2px solid #6366f1; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+                .important { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0; border-radius: 4px; }
+                .important p { margin: 8px 0; font-size: 14px; }
+                .step { margin: 15px 0; padding: 12px; background: #f9f9f9; border-left: 3px solid #6366f1; }
+                .step-title { font-weight: bold; color: #6366f1; }
+                .footer { text-align: center; margin-top: 30px; color: #999; font-size: 12px; padding-top: 20px; border-top: 1px solid #eee; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <div class='logo'>Lingua<span style='color: #22d3ee;'>School</span></div>
+                </div>
+                
+                <div class='content'>
+                    <div class='greeting'>Привіт, Vicky! 👋</div>
+                    
+                    <p>Вас додано до платформи LinguaSchool. Нижче наведені дані для входу:</p>
+                    
+                    <div class='credentials'>
+                        <label class='label'>📧 Логін (Email):</label>
+                        <div class='value'>vesnyshh@gmail.com</div>
+                        
+                        <label class='label' style='margin-top: 15px;'>🔐 Тимчасовий пароль:</label>
+                        <div class='value'>33e8c485983a</div>
+                    </div>
+                    
+                    <div class='important'>
+                        <p><strong>⚠️ Важливо:</strong></p>
+                        <p>• Це <strong>тимчасовий пароль</strong>, створений адміністратором</p>
+                        <p>• При першому вході ви матимете можливість змінити його на власний надійний пароль</p>
+                        <p>• Збережіть цей пароль у безпечному місці</p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 1️⃣ Вхід на платформу</p>
+                        <p>Перейдіть за посиланням:</p>
+                        <p style='margin: 10px 0; word-break: break-all;'>
+                            <a href='http://localhost:3000/LanguageSchool/LanguageSchool/login.php' 
+                               style='color: #6366f1; text-decoration: none; font-weight: bold;'>
+                                http://localhost:3000/LanguageSchool/LanguageSchool/login.php
+                            </a>
+                        </p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 2️⃣ Введіть дані</p>
+                        <p>• <strong>Email:</strong> vesnyshh@gmail.com</p>
+                        <p>• <strong>Пароль:</strong> 33e8c485983a</p>
+                    </div>
+                    
+                    <div class='step'>
+                        <p class='step-title'>Крок 3️⃣ Змініть пароль</p>
+                        <p>Після входу перейдіть в особистий кабінет та змініть пароль на свій власний. Використовуйте надійний пароль, який містить букви, цифри та спеціальні символи.</p>
+                    </div>
+                    
+                    <p style='margin-top: 20px; font-size: 14px;'>Якщо у вас виникли запитання або проблеми, зверніться до адміністратора школи.</p>
+                </div>
+                
+                <div class='footer'>
+                    <p>© 2025 LinguaSchool. Усі права захищені.</p>
+                    <p>Це автоматично згенероване повідомлення, будь ласка, не відповідайте на нього.</p>
+                </div>
+            </div>
+        </body>
+    </html>
+    
+---
+

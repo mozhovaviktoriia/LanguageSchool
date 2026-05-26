@@ -2,12 +2,21 @@
 session_start();
 require 'config.php';
 
-// Якщо залогінений НЕ як студент — скидаємо сесію і показуємо форму реєстрації
-// (реєстрація лише для нових учнів)
+// Якщо залогінений — скидаємо сесію (реєстрація лише для нових учнів)
 if (isset($_SESSION['user_id'])) {
     session_unset();
     session_destroy();
     session_start();
+}
+
+// Google OAuth — перевіряємо чи прийшли з Google
+$viaGoogle = isset($_GET['via']) && $_GET['via'] === 'google' && isset($_SESSION['google_email']);
+
+// Підставляємо дані з Google якщо GET-запит (не POST)
+if ($viaGoogle && $_SERVER['REQUEST_METHOD'] !== 'POST') {
+    $_POST['email']      = $_SESSION['google_email'];
+    $_POST['first_name'] = $_SESSION['google_first_name'];
+    $_POST['last_name']  = $_SESSION['google_last_name'];
 }
 
 // Завантаження активних курсів
@@ -34,13 +43,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone     = trim($_POST['phone']      ?? '');
     $email     = trim($_POST['email']      ?? '');
     $password  = trim($_POST['password']   ?? '');
-    $courseId  = trim($_POST['course_id']  ?? ''); // UUID — не int!
+    $courseId  = trim($_POST['course_id']  ?? '');
+    $isGoogle  = !empty($_POST['via_google']); // прихований input
 
-    if (!$firstName || !$lastName || !$phone || !$email || !$password || !$courseId) {
+    // Валідація
+    if (!$firstName || !$lastName || !$phone || !$email || !$courseId) {
         $message = 'Будь ласка, заповніть усі поля.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $message = 'Невірний формат email.';
-    } elseif (mb_strlen($password) < 6) {
+    } elseif (!$isGoogle && mb_strlen($password) < 6) {
+        // Пароль перевіряємо лише якщо реєстрація не через Google
         $message = 'Пароль має бути не менше 6 символів.';
     } else {
         $chk = $pdo->prepare("SELECT id FROM users WHERE email = :email");
@@ -51,9 +63,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $pdo->beginTransaction();
 
-                $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+                // Якщо через Google — генеруємо випадковий пароль (не потрібен для входу)
+                $hashedPassword = $isGoogle
+                    ? password_hash(bin2hex(random_bytes(16)), PASSWORD_BCRYPT)
+                    : password_hash($password, PASSWORD_BCRYPT);
 
-                // RETURNING id — єдиний спосіб отримати UUID після INSERT у PostgreSQL
                 $stmt = $pdo->prepare("
                     INSERT INTO users (email, password_hash, first_name, last_name, phone, role, status)
                     VALUES (:email, :hash, :fn, :ln, :phone, 'student', 'inactive')
@@ -77,6 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $enroll->execute(['uid' => $userId, 'cid' => $courseId]);
 
                 $pdo->commit();
+
+                // Очищаємо Google-дані з сесії
+                unset($_SESSION['google_email'], $_SESSION['google_first_name'], $_SESSION['google_last_name']);
+
                 $success = true;
 
             } catch (PDOException $e) {
@@ -134,6 +152,21 @@ body {
     font-family: 'JetBrains Mono', monospace;
 }
 
+/* Банер "реєстрація через Google" */
+.google-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(66,133,244,0.15);
+    border: 1px solid rgba(66,133,244,0.35);
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 18px;
+    color: #93c5fd;
+}
+
 .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field { margin-bottom: 14px; }
 
@@ -166,6 +199,11 @@ body {
 .field select:focus {
     border-color: rgba(255,255,255,0.55);
     background: rgba(255,255,255,0.15);
+}
+
+.field input:read-only {
+    opacity: .6;
+    cursor: not-allowed;
 }
 
 .field select {
@@ -234,6 +272,48 @@ body {
     transform: none;
 }
 
+/* Кнопка Google на сторінці реєстрації */
+.divider-or {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 16px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    opacity: .5;
+}
+.divider-or::before, .divider-or::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.25);
+}
+
+.btn-google {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 13px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-family: var(--font, 'Syne', sans-serif);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background .2s, transform .2s;
+    cursor: pointer;
+}
+.btn-google:hover {
+    background: rgba(255,255,255,0.2);
+    transform: translateY(-1px);
+}
+
 .msg {
     margin-top: 16px;
     padding: 12px 16px;
@@ -282,20 +362,39 @@ body {
     <div class="logo">Lingua<span>School</span></div>
     <div class="subtitle">Реєстрація нового студента</div>
 
-    <form method="POST">
+    <?php if ($viaGoogle): ?>
+    <div class="google-badge">
+        <svg width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.86l6.1-6.1C34.46 3.09 29.48 1 24 1 14.82 1 7.07 6.48 3.73 14.22l7.1 5.52C12.5 13.59 17.8 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v8.97h12.42c-.54 2.9-2.18 5.36-4.65 7.01l7.13 5.54C43.16 37.37 46.1 31.4 46.1 24.5z"/>
+            <path fill="#FBBC05" d="M10.83 28.26A14.58 14.58 0 0 1 9.5 24c0-1.48.25-2.91.7-4.26l-7.1-5.52A23.93 23.93 0 0 0 .5 24c0 3.87.93 7.53 2.57 10.75l7.76-6.49z"/>
+            <path fill="#34A853" d="M24 46.5c5.48 0 10.08-1.82 13.44-4.93l-7.13-5.54c-1.98 1.32-4.51 2.1-6.31 2.1-6.2 0-11.5-4.09-13.17-9.74l-7.76 6.49C7.07 41.52 14.82 46.5 24 46.5z"/>
+        </svg>
+        Реєстрація через Google — оберіть курс і вкажіть телефон
+    </div>
+    <?php endif; ?>
+
+    <form method="POST" action="register.php<?= $viaGoogle ? '?via=google' : '' ?>">
+
+        <?php if ($viaGoogle): ?>
+            <!-- Прихований маркер Google-реєстрації -->
+            <input type="hidden" name="via_google" value="1">
+        <?php endif; ?>
 
         <div class="row-2">
             <div class="field">
                 <label>Ім'я</label>
                 <input type="text" name="first_name"
                        placeholder="Оля"
-                       value="<?= htmlspecialchars($_POST['first_name'] ?? '') ?>" required>
+                       value="<?= htmlspecialchars($_POST['first_name'] ?? '') ?>"
+                       <?= $viaGoogle ? 'readonly' : '' ?> required>
             </div>
             <div class="field">
                 <label>Прізвище</label>
                 <input type="text" name="last_name"
                        placeholder="Дяченко"
-                       value="<?= htmlspecialchars($_POST['last_name'] ?? '') ?>" required>
+                       value="<?= htmlspecialchars($_POST['last_name'] ?? '') ?>"
+                       <?= $viaGoogle ? 'readonly' : '' ?> required>
             </div>
         </div>
 
@@ -310,13 +409,16 @@ body {
             <label>Email</label>
             <input type="email" name="email"
                    placeholder="student@email.com"
-                   value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
+                   value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                   <?= $viaGoogle ? 'readonly' : '' ?> required>
         </div>
 
+        <?php if (!$viaGoogle): ?>
         <div class="field">
             <label>Пароль</label>
             <input type="password" name="password" placeholder="Мінімум 6 символів" required>
         </div>
+        <?php endif; ?>
 
         <div class="divider">Обрати курс</div>
 
@@ -341,7 +443,7 @@ body {
         <?php endif; ?>
 
         <button type="submit" class="btn-submit" <?= empty($courses) ? 'disabled' : '' ?>>
-            Подати заявку
+            <?= $viaGoogle ? 'Завершити реєстрацію' : 'Подати заявку' ?>
         </button>
 
         <?php if ($message): ?>
@@ -349,6 +451,19 @@ body {
         <?php endif; ?>
 
     </form>
+
+    <?php if (!$viaGoogle): ?>
+    <div class="divider-or">або</div>
+    <a href="oauth_google.php" class="btn-google">
+        <svg width="18" height="18" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#EA4335" d="M24 9.5c3.14 0 5.95 1.08 8.17 2.86l6.1-6.1C34.46 3.09 29.48 1 24 1 14.82 1 7.07 6.48 3.73 14.22l7.1 5.52C12.5 13.59 17.8 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.1 24.5c0-1.64-.15-3.22-.42-4.74H24v8.97h12.42c-.54 2.9-2.18 5.36-4.65 7.01l7.13 5.54C43.16 37.37 46.1 31.4 46.1 24.5z"/>
+            <path fill="#FBBC05" d="M10.83 28.26A14.58 14.58 0 0 1 9.5 24c0-1.48.25-2.91.7-4.26l-7.1-5.52A23.93 23.93 0 0 0 .5 24c0 3.87.93 7.53 2.57 10.75l7.76-6.49z"/>
+            <path fill="#34A853" d="M24 46.5c5.48 0 10.08-1.82 13.44-4.93l-7.13-5.54c-1.98 1.32-4.51 2.1-6.31 2.1-6.2 0-11.5-4.09-13.17-9.74l-7.76 6.49C7.07 41.52 14.82 46.5 24 46.5z"/>
+        </svg>
+        Зареєструватись через Google
+    </a>
+    <?php endif; ?>
 
     <div class="links">
         <a href="index.php">← На головну</a>

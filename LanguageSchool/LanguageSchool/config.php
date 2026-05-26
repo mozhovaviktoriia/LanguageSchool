@@ -1,4 +1,38 @@
 <?php
+// Load environment variables from .env file
+function loadEnv($filePath = null) {
+    if ($filePath === null) {
+        $filePath = __DIR__ . '/.env';
+    }
+    
+    if (!file_exists($filePath)) {
+        return;
+    }
+    
+    $lines = file($filePath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (strpos($line, '=') === false || strpos($line, '#') === 0) {
+            continue;
+        }
+        
+        list($name, $value) = explode('=', $line, 2);
+        $name = trim($name);
+        $value = trim($value);
+        
+        // Remove quotes if present
+        if (preg_match('/^"(.*)"$/', $value)) {
+            $value = substr($value, 1, -1);
+        }
+        
+        if (!isset($_ENV[$name])) {
+            $_ENV[$name] = $value;
+        }
+    }
+}
+
+// Load .env file
+loadEnv();
+
 $host = "localhost";
 $port = "5432";
 $dbname = "LanguageSchool";
