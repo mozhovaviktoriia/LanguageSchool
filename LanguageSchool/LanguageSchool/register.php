@@ -340,6 +340,26 @@ body {
     transition: color .2s;
 }
 .links a:hover { color: #fff; }
+
+/* Validation styles */
+.field input.valid {
+    border-color: rgba(52,211,153,.6);
+    background: rgba(52,211,153,.1);
+}
+
+.field input.invalid {
+    border-color: rgba(239,68,68,.6);
+    background: rgba(239,68,68,.1);
+}
+
+.field-hint {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #ff5252;
+    margin-top: 5px;
+    min-height: 16px;
+}
 </style>
 </head>
 <body>
@@ -400,17 +420,19 @@ body {
 
         <div class="field">
             <label>Номер телефону</label>
-            <input type="tel" name="phone"
+            <input type="tel" id="phoneInput" name="phone"
                    placeholder="+380XXXXXXXXX"
                    value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" required>
+            <div class="field-hint" id="phoneHint"></div>
         </div>
 
         <div class="field">
             <label>Email</label>
-            <input type="email" name="email"
+            <input type="email" id="emailInput" name="email"
                    placeholder="student@email.com"
                    value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
                    <?= $viaGoogle ? 'readonly' : '' ?> required>
+            <div class="field-hint" id="emailHint"></div>
         </div>
 
         <?php if (!$viaGoogle): ?>
@@ -473,6 +495,46 @@ body {
 <?php endif; ?>
 
 </div>
+<script>
+function validatePhoneJS(val) {
+    return /^\+?3?8?(0\d{9})$/.test(val.replace(/[\s\-()]/g, ''));
+}
+function validateEmailJS(val) {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(val) && val.length <= 100;
+}
+
+// Перевіряємо наявність елементів перед додаванням обробників
+const phoneInput = document.getElementById('phoneInput');
+const emailInput = document.getElementById('emailInput');
+ 
+if (phoneInput) {
+    phoneInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^\d\+\s\-\(\)]/g, '');
+    });
+    phoneInput.addEventListener('blur', function() {
+        const hint = document.getElementById('phoneHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validatePhoneJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'Некоректно введений номер';
+        }
+    });
+}
+if (emailInput && !emailInput.readOnly) {
+    emailInput.addEventListener('blur', function() {
+        const hint = document.getElementById('emailHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validateEmailJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'Некоректно введено пошту';
+        }
+    });
+}
+</script>
 <script src="theme-switcher.js"></script>
 </body>
 </html>

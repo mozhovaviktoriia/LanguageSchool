@@ -16,6 +16,11 @@ if (isset($_GET['logout'])) {
 // Delete user
 if (isset($_GET['delete_user'])) {
     $uid = $_GET['delete_user'];
+    // Спочатку видаляємо всі пов'язані записи
+    $pdo->prepare("DELETE FROM enrollments WHERE student_id = :id")->execute(['id' => $uid]);
+    $pdo->prepare("DELETE FROM enrollments WHERE course_id IN (SELECT id FROM courses WHERE teacher_id = :id)")->execute(['id' => $uid]);
+    $pdo->prepare("DELETE FROM courses WHERE teacher_id = :id")->execute(['id' => $uid]);
+    // Тепер можна видалити користувача
     $pdo->prepare("DELETE FROM users WHERE id = :id")->execute(['id' => $uid]);
     header("Location: admin.php"); exit;
 }

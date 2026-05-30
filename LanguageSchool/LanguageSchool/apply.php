@@ -1,6 +1,18 @@
 <?php
 require 'config.php';
 
+// Функція валідації телефону
+function validatePhone(string $phone): bool {
+    // Дозволяє: +380XXXXXXXXX (12 цифр після +) або 0XXXXXXXXX (10 цифр)
+    return (bool) preg_match('/^\+?3?8?(0\d{9})$/', preg_replace('/[\s\-()]/', '', $phone));
+}
+
+// Функція валідації email
+function validateEmail(string $email): bool {
+    return (bool) filter_var($email, FILTER_VALIDATE_EMAIL) 
+        && strlen($email) <= 100
+        && preg_match('/\.[a-zA-Z]{2,6}$/', $email);
+}
 // Load active courses for dropdown
 $courses = $pdo->query("
     SELECT c.id, c.title, c.level, c.price, l.name_ua
@@ -16,26 +28,33 @@ $success = false;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name     = trim($_POST['name']      ?? '');
     $phone    = trim($_POST['phone']     ?? '');
+    $email    = trim($_POST['email']     ?? '');
     $courseId = trim($_POST['course_id'] ?? '');
 
-    if (!$name || !$phone || !$courseId) {
-        $error = 'Будь ласка, заповніть усі поля.';
-    } else {
-        try {
-            $pdo->prepare("
-                INSERT INTO applications (name, phone, course_id)
-                VALUES (:name, :phone, :course_id)
-            ")->execute([
-                'name'      => $name,
-                'phone'     => $phone,
-                'course_id' => $courseId,
-            ]);
-            $success = true;
-        } catch (PDOException $e) {
-            $error = 'Щось пішло не так, спробуйте ще раз.';
-        }
+   if (!$name || !$phone || !$email || !$courseId) {
+    $error = 'Будь ласка, заповніть усі поля.';
+} elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || !preg_match('/\.[a-zA-Z]{2,6}$/', $email) || strlen($email) > 100) {
+    $error = 'Невірний формат email. Приклад: name@domain.ua';
+} elseif (!preg_match('/^\+?3?8?(0\d{9})$/', preg_replace('/[\s\-()]/', '', $phone))) {
+    $error = 'Невірний номер телефону. Приклад: +380961234567 або 0961234567';
+} else {
+    try {
+        $pdo->prepare("
+            INSERT INTO applications (name, phone, email, course_id)
+            VALUES (:name, :phone, :email, :course_id)
+        ")->execute([
+            'name'      => $name,
+            'phone'     => $phone,
+            'email'     => $email,
+            'course_id' => $courseId,
+        ]);
+        $success = true;
+    } catch (PDOException $e) {
+        $error = 'Щось пішло не так, спробуйте ще раз.';
     }
 }
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="uk">
@@ -263,6 +282,26 @@ body::before {
     color: #fff;
     background: rgba(255,255,255,.05);
 }
+
+/* Validation styles */
+.field input.valid {
+    border-color: rgba(52,211,153,.6);
+    background: rgba(52,211,153,.1);
+}
+
+.field input.invalid {
+    border-color: rgba(239,68,68,.6);
+    background: rgba(239,68,68,.1);
+}
+
+.field-hint {
+    display: block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #ff5252;
+    margin-top: 6px;
+    min-height: 16px;
+}
 </style>
 </head>
 <body>
@@ -289,6 +328,10 @@ body::before {
             <div class="success-card-row">
                 <span>Телефон</span>
                 <span><?= htmlspecialchars($_POST['phone']) ?></span>
+            </div>
+            <div class="success-card-row">
+                <span>Email</span>
+                <span><?= htmlspecialchars($_POST['email']) ?></span>
             </div>
             <?php if ($selected): ?>
             <div class="success-card-row">
@@ -324,12 +367,28 @@ body::before {
             <label>Номер телефону</label>
             <input
                 type="tel"
+                id="phoneInput"
                 name="phone"
                 placeholder="+380 XX XXX XX XX"
                 value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
                 required
                 autocomplete="tel"
             >
+            <div class="field-hint" id="phoneHint"></div>
+        </div>
+
+        <div class="field">
+            <label>Email</label>
+            <input
+                type="email"
+                id="emailInput"
+                name="email"
+                placeholder="example@email.com"
+                value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
+                required
+                autocomplete="email"
+            >
+            <div class="field-hint" id="emailHint"></div>
         </div>
 
         <div class="field">
@@ -364,6 +423,46 @@ body::before {
 <?php endif; ?>
 
 </div>
+<script>
+function validatePhoneJS(val) {
+    return /^\+?3?8?(0\d{9})$/.test(val.replace(/[\s\-()]/g, ''));
+}
+function validateEmailJS(val) {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(val) && val.length <= 100;
+}
 
+// Перевіряємо наявність елементів перед додаванням обробників
+const phoneInput = document.getElementById('phoneInput');
+const emailInput = document.getElementById('emailInput');
+
+if (phoneInput) {
+    phoneInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^\d\+\s\-\(\)]/g, '');
+    });
+    phoneInput.addEventListener('blur', function() {
+        const hint = document.getElementById('phoneHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validatePhoneJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'некоректно введений номер';
+        }
+    });
+}
+
+if (emailInput) {
+    emailInput.addEventListener('blur', function() {
+        const hint = document.getElementById('emailHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validateEmailJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'некоректно введено пошту';
+        }
+    });
+}
+</script>
 </body>
 </html>

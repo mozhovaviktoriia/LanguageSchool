@@ -598,9 +598,21 @@ body::before {
 .field input::placeholder,
 .field textarea::placeholder { color: var(--muted); }
 
+.field input.valid {
+    border-color: #22c55e;
+    background: rgba(34,197,94,.06);
+}
+
+.field input.invalid {
+    border-color: #ef4444;
+    background: rgba(239,68,68,.06);
+}
+
 .field-hint {
+    display: block;
     font-family: var(--mono); font-size: 9px;
-    color: var(--muted); margin-top: 5px;
+    color: #ff5252; margin-top: 5px;
+    min-height: 16px;
 }
 
 .field-full { grid-column: 1/-1; }
@@ -833,11 +845,13 @@ body::before {
                             </div>
                             <div class="field">
                                 <label>Email *</label>
-                                <input type="email" name="email" value="<?= htmlspecialchars($user['email']) ?>" placeholder="student@school.ua" required>
+                                <input type="email" id="profileEmailInput" name="email" value="<?= htmlspecialchars($user['email']) ?>" placeholder="student@school.ua" required>
+                                <div class="field-hint" id="profileEmailHint"></div>
                             </div>
                             <div class="field">
                                 <label>Телефон</label>
-                                <input type="text" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="+380 xx xxx xx xx">
+                                <input type="text" id="profilePhoneInput" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="+380 xx xxx xx xx">
+                                <div class="field-hint" id="profilePhoneHint"></div>
                             </div>
                         </div>
                         <div class="btn-row">
@@ -974,6 +988,47 @@ setTimeout(() => {
         setTimeout(() => el.remove(), 500);
     });
 }, 4000);
+
+/* Валідація email та телефону */
+function validatePhoneJS(val) {
+    return /^\+?3?8?(0\d{9})$/.test(val.replace(/[\s\-()]/g, ''));
+}
+
+function validateEmailJS(val) {
+    return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(val) && val.length <= 100;
+}
+
+const profilePhoneInput = document.getElementById('profilePhoneInput');
+const profileEmailInput = document.getElementById('profileEmailInput');
+
+if (profilePhoneInput) {
+    profilePhoneInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^\d\+\s\-\(\)]/g, '');
+    });
+    profilePhoneInput.addEventListener('blur', function() {
+        const hint = document.getElementById('profilePhoneHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validatePhoneJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'некоректно введений номер';
+        }
+    });
+}
+
+if (profileEmailInput) {
+    profileEmailInput.addEventListener('blur', function() {
+        const hint = document.getElementById('profileEmailHint');
+        if (!this.value) { this.classList.remove('valid','invalid'); hint.textContent = ''; return; }
+        if (validateEmailJS(this.value)) {
+            this.classList.add('valid'); this.classList.remove('invalid'); hint.textContent = '';
+        } else {
+            this.classList.add('invalid'); this.classList.remove('valid');
+            hint.textContent = 'некоректно введено пошту';
+        }
+    });
+}
 </script>
 <script src="theme-switcher.js"></script>
 </body>
