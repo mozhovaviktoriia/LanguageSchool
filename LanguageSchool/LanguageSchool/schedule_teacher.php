@@ -491,6 +491,19 @@ body::before {
 .toast.success { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.3); color: var(--green); }
 .toast.error   { background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.3); color: #fca5a5; }
 
+/* ══ STUDENT CHECKBOX LIST ══ */
+.student-list { display: flex; flex-direction: column; gap: 8px; }
+.student-checkbox {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; transition: .15s; font-size: 13px;
+}
+.student-checkbox:hover { background: rgba(99,102,241,.08); border-color: rgba(99,102,241,.3); }
+.student-checkbox input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.student-checkbox-label { flex: 1; cursor: pointer; user-select: none; }
+.students-toggle-all { padding: 8px 10px; background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.2); border-radius: 6px; font-size: 12px; cursor: pointer; transition: .15s; text-align: center; }
+.students-toggle-all:hover { background: rgba(99,102,241,.18); }
+
 @keyframes popIn     { from { opacity: 0; transform: scale(.93) translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes slideInRight { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
 body.light-theme .sidebar { background: rgba(255,255,255,.98) !important; border-right-color: #e2e8f0 !important; }
@@ -654,12 +667,14 @@ body.light-theme .empty-sub   { color: #94a3b8 !important; }
                 </select>
             </div>
             <div class="form-group">
-                <label class="form-label">Студент (необов'язково)</label>
-                <select id="lessonStudent" class="form-select">
-                    <option value="">— Всі студенти курсу —</option>
-                </select>
+                <label class="form-label">Студенти (необов'язково)</label>
+                <div id="studentSelection" style="display:none;">
+                    <button type="button" class="students-toggle-all" id="toggleAllStudents">Вибрати всіх</button>
+                    <div class="student-list" id="studentList"></div>
+                </div>
+                <div id="noStudentsMsg" style="padding:10px;color:var(--muted);font-size:12px;">Оберіть курс для отримання списку студентів</div>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="statusGroup">
                 <label class="form-label">Статус</label>
                 <select id="lessonStatus" class="form-select">
                     <option value="scheduled">📌 Заплановано</option>
@@ -1051,8 +1066,8 @@ function openAddModal(prefillDate = null) {
     document.getElementById('lessonDate').value  = prefillDate || new Date().toISOString().split('T')[0];
     document.getElementById('lessonStart').value = '';
     document.getElementById('lessonUrl').value   = '';
-    document.getElementById('lessonStatus').value = 'scheduled';
-    document.getElementById('lessonStudent').innerHTML = '<option value="">— Всі студенти курсу —</option>';
+    document.getElementById('statusGroup').style.display = 'none';
+    clearStudentSelection();
     modal.classList.add('show');
     // Фокусуємось на полі з назвою
     setTimeout(() => document.getElementById('lessonTitle').focus(), 100);
@@ -1065,16 +1080,47 @@ document.addEventListener('keydown', e => {
 });
 
 /* ── Оновлення списку студентів при зміні курсу ── */
-document.getElementById('lessonCourse').addEventListener('change', function () {
-    const sel = document.getElementById('lessonStudent');
-    sel.innerHTML = '<option value="">— Всі студенти курсу —</option>';
-    const students = studentsByCourse[this.value] || [];
+function clearStudentSelection() {
+    document.getElementById('studentList').innerHTML = '';
+    document.getElementById('studentSelection').style.display = 'none';
+    document.getElementById('noStudentsMsg').style.display = 'block';
+}
+
+function updateStudentList(courseId) {
+    const sel = document.getElementById('studentSelection');
+    const lst = document.getElementById('studentList');
+    const msg = document.getElementById('noStudentsMsg');
+    const students = studentsByCourse[courseId] || [];
+    
+    if (!students.length) {
+        clearStudentSelection();
+        return;
+    }
+    
+    sel.style.display = 'block';
+    msg.style.display = 'none';
+    lst.innerHTML = '';
+    
     students.forEach(s => {
-        const o = document.createElement('option');
-        o.value = s.id;
-        o.textContent = s.name;
-        sel.appendChild(o);
+        const chk = document.createElement('label');
+        chk.className = 'student-checkbox';
+        chk.innerHTML = `
+            <input type="checkbox" value="${s.id}" data-name="${s.name}">
+            <span class="student-checkbox-label">${s.name}</span>
+        `;
+        lst.appendChild(chk);
     });
+}
+
+document.getElementById('lessonCourse').addEventListener('change', function () {
+    updateStudentList(this.value);
+});
+
+document.getElementById('toggleAllStudents').addEventListener('click', function (e) {
+    e.preventDefault();
+    const checkboxes = document.querySelectorAll('#studentList input[type="checkbox"]');
+    const allChecked = Array.from(checkboxes).every(c => c.checked);
+    checkboxes.forEach(c => c.checked = !allChecked);
 });
 
 /* ── Edit ── */
@@ -1100,26 +1146,21 @@ async function editLesson(id) {
         document.getElementById('lessonUrl').value        = l.meeting_url || '';
         document.getElementById('lessonDate').value       = dateStr;
         document.getElementById('lessonStart').value      = timeStr;
-        document.getElementById('lessonStatus').value     = l.status || 'scheduled';
+
+        document.getElementById('lessonStatus').value = l.status || 'scheduled';
+        document.getElementById('statusGroup').style.display = 'block';
 
         /* Виставити курс і оновити студентів */
         const studentId = l.student_id || null;
         document.getElementById('lessonCourse').value = l.course_id || '';
         
         // Оновлюємо список студентів для цього курсу
-        const sel = document.getElementById('lessonStudent');
-        sel.innerHTML = '<option value="">— Всі студенти курсу —</option>';
-        const students = studentsByCourse[l.course_id] || [];
-        students.forEach(s => {
-            const o = document.createElement('option');
-            o.value = s.id;
-            o.textContent = s.name;
-            sel.appendChild(o);
-        });
+        updateStudentList(l.course_id || '');
         
         // Встановлюємо вибраного студента (якщо він був обраний)
         if (studentId) {
-            document.getElementById('lessonStudent').value = studentId;
+            const checkbox = document.querySelector(`#studentList input[value="${studentId}"]`);
+            if (checkbox) checkbox.checked = true;
         }
 
         modal.classList.add('show');
@@ -1163,17 +1204,38 @@ async function saveLesson() {
     if (!date)   { showToast('Оберіть дату', 'error'); return; }
     if (!start)  { showToast('Вкажіть час початку', 'error'); return; }
 
+    // Забороняємо створення заднім числом (редагування існуючих — дозволено)
+    if (!id) {
+        const selected = new Date(date + 'T' + (start || '00:00'));
+        const now      = new Date();
+        if (selected < now) {
+            showToast('Не можна створити заняття в минулому', 'error');
+            return;
+        }
+    }
+
+    // Збираємо ID вибраних студентів
+    const selectedStudents = [];
+    document.querySelectorAll('#studentList input[type="checkbox"]:checked').forEach(chk => {
+        selectedStudents.push(chk.value);
+    });
+
     const fd = new FormData();
     fd.append('action',      id ? 'update' : 'add');
     fd.append('id',          id);
     fd.append('title',       title);
     fd.append('description', document.getElementById('lessonDesc').value);
     fd.append('course_id',   course);
-    fd.append('student_id',  document.getElementById('lessonStudent').value);
+    // Якщо студенти вибрані, отправляємо першого (або всіх, залежить від API)
+    fd.append('student_id',  selectedStudents.length > 0 ? selectedStudents[0] : '');
+    // Додаємо список всіх вибраних студентів (можна розширити на серверу)
+    fd.append('selected_students', selectedStudents.join(','));
     fd.append('date',        date);
     fd.append('start_time',  start);
     fd.append('meeting_url', document.getElementById('lessonUrl').value.trim());
-    fd.append('status',      document.getElementById('lessonStatus').value);
+    
+    const lid = document.getElementById('lessonId').value;
+    fd.append('status', lid ? document.getElementById('lessonStatus').value : 'scheduled');
 
     try {
         const res  = await fetch('api_lesson.php', { method: 'POST', body: fd });

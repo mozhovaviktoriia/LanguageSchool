@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════
-// Theme Switcher — виправлена версія без мерехтіння
+// Theme Switcher — швидка версія без затримок
 // ════════════════════════════════════════════════════════════
 
 (function () {
@@ -32,7 +32,6 @@
     }
 
     // Ранній запуск — до DOMContentLoaded — щоб уникнути flash
-    // Для цього додаємо клас light-theme одразу на <html>
     var earlyTheme = getSavedTheme();
     if (earlyTheme === 'light') {
         document.documentElement.classList.add('light-theme');
@@ -40,9 +39,6 @@
 
     // Повна ініціалізація після завантаження DOM
     function init() {
-        // Знімаємо блокування видимості якщо було
-        document.body.classList.remove('theme-loading');
-
         // Застосовуємо тему на body
         applyTheme(earlyTheme);
 

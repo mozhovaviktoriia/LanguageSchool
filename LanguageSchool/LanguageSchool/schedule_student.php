@@ -38,6 +38,7 @@ $monthEndStr   = $monthEnd->format('Y-m-d');
 $rangeStart = $view === 'week' ? $weekStart : $monthStartStr;
 $rangeEnd   = $view === 'week' ? $weekEnd   : $monthEndStr;
 
+/* ── Lessons ── */
 $stmtLessons = $pdo->prepare("
     SELECT
         l.id, l.title, l.scheduled_at, l.lesson_type, l.meeting_url,
@@ -61,6 +62,30 @@ $stmtLessons = $pdo->prepare("
 $stmtLessons->execute([':sid' => $studentId, ':ws' => $rangeStart, ':we' => $rangeEnd]);
 $lessons = $stmtLessons->fetchAll(PDO::FETCH_ASSOC);
 
+/* ── Tasks (homework deadlines) ── */
+$stmtTasks = $pdo->prepare("
+    SELECT
+        t.id, t.title, t.deadline, t.max_score,
+        COALESCE(c.title, c2.title) AS course_title,
+        COALESCE(l.course_id, t.course_id) AS course_id,
+        ts.status AS sub_status
+    FROM tasks t
+    LEFT JOIN lessons l   ON t.lesson_id = l.id
+    LEFT JOIN courses c   ON c.id = l.course_id
+    LEFT JOIN courses c2  ON c2.id = t.course_id
+    LEFT JOIN task_submissions ts ON ts.task_id = t.id AND ts.student_id = :sid
+    WHERE (t.assigned_to = :sid2 OR t.assigned_to IS NULL)
+      AND t.deadline IS NOT NULL
+      AND DATE(t.deadline) BETWEEN :ws AND :we
+      AND COALESCE(l.course_id, t.course_id) IN (
+          SELECT course_id FROM enrollments WHERE student_id = :sid3 AND status = 'active'
+      )
+    ORDER BY t.deadline ASC
+");
+$stmtTasks->execute([':sid' => $studentId, ':sid2' => $studentId, ':sid3' => $studentId, ':ws' => $rangeStart, ':we' => $rangeEnd]);
+$taskEvents = $stmtTasks->fetchAll(PDO::FETCH_ASSOC);
+
+/* ── Color map ── */
 $palette  = ['#6366f1','#22d3ee','#22c55e','#f59e0b','#ec4899','#8b5cf6','#14b8a6','#f97316'];
 $colorMap = [];
 foreach ($lessons as $l) {
@@ -68,9 +93,12 @@ foreach ($lessons as $l) {
         $colorMap[$l['course_id']] = $palette[count($colorMap) % count($palette)];
 }
 
+/* ── Group by day ── */
 $byDay    = [];
 $byDayIdx = array_fill(0, 7, []);
+
 foreach ($lessons as $l) {
+    $l['_type'] = 'lesson';
     $dt  = new DateTime($l['scheduled_at']);
     $key = $dt->format('Y-m-d');
     $byDay[$key][] = $l;
@@ -80,11 +108,25 @@ foreach ($lessons as $l) {
     }
 }
 
+foreach ($taskEvents as $t) {
+    $t['_type'] = 'task';
+    $dt  = new DateTime($t['deadline']);
+    $key = $dt->format('Y-m-d');
+    $byDay[$key][] = $t;
+    if ($view === 'week') {
+        $idx = (int)$dt->format('N') - 1;
+        if ($idx >= 0 && $idx < 7) $byDayIdx[$idx][] = $t;
+    }
+}
+
+/* ── Stats ── */
 $totalLessons  = count($lessons);
 $completedLess = 0;
 $upcomingLess  = count($lessons);
 $totalMin      = count($lessons) * 60;
+$pendingTasks  = count(array_filter($taskEvents, fn($t) => !in_array($t['sub_status'], ['submitted','reviewed'])));
 
+/* ── Hour range ── */
 $minHour = 8; $maxHour = 21; $pxPerHour = 64;
 if ($view === 'week' && $lessons) {
     $sh = array_map(fn($l) => (int)(new DateTime($l['scheduled_at']))->format('H'), $lessons);
@@ -106,6 +148,7 @@ function lessonJson(array $l, array $colorMap): string {
     $dur = 60;
     $end = (clone $dt)->modify("+$dur minutes");
     return json_encode([
+        '_type'   => 'lesson',
         'title'   => $l['title'],
         'course'  => $l['course_title'],
         'teacher' => trim(($l['teacher_first'] ?? '') . ' ' . ($l['teacher_last'] ?? '')),
@@ -118,6 +161,27 @@ function lessonJson(array $l, array $colorMap): string {
         'url'     => $l['meeting_url'] ?? '',
         'color'   => $colorMap[$l['course_id']] ?? '#6366f1',
         'lang'    => $l['lang_name'],
+    ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+}
+
+function taskJson(array $t): string {
+    $dt = new DateTime($t['deadline']);
+    $statusMap = [
+        'submitted' => 'submitted',
+        'reviewed'  => 'reviewed',
+        'assigned'  => 'returned',
+    ];
+    $status = $statusMap[$t['sub_status'] ?? ''] ?? 'pending';
+    return json_encode([
+        '_type'      => 'task',
+        'id'         => $t['id'],
+        'title'      => $t['title'],
+        'course'     => $t['course_title'] ?? '',
+        'date'       => $dt->format('d.m.Y'),
+        'time'       => $dt->format('H:i'),
+        'score'      => $t['max_score'],
+        'status'     => $status,
+        'sub_status' => $t['sub_status'],
     ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
 }
 ?>
@@ -282,6 +346,7 @@ body::before {
 .now-line  { position:absolute; left:0; right:0; height:2px; background:linear-gradient(90deg,var(--red),rgba(239,68,68,.2)); z-index:5; pointer-events:none; }
 .now-dot   { position:absolute; left:-4px; top:-4px; width:9px; height:9px; border-radius:50%; background:var(--red); box-shadow:0 0 8px var(--red); }
 
+/* ── Lesson block ── */
 .lb {
     position:absolute; left:2px; right:2px; border-radius:8px; padding:5px 7px; overflow:hidden;
     cursor:pointer; transition:transform .13s,box-shadow .13s; display:flex; flex-direction:column;
@@ -292,6 +357,37 @@ body::before {
 .lb-title { font-size:11px; font-weight:700; line-height:1.3; margin-top:1px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lb-sub   { font-family:var(--mono); font-size:9px; opacity:.65; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lb-time  { font-family:var(--mono); font-size:8px; opacity:.7; margin-top:auto; padding-top:3px; }
+
+/* ── Task deadline block ── */
+.lb-task {
+    position:absolute; left:2px; right:2px; border-radius:8px; padding:5px 7px;
+    cursor:pointer; transition:transform .13s, box-shadow .13s;
+    display:flex; flex-direction:column; z-index:3;
+    border-left:3px solid #f59e0b;
+    background: rgba(245,158,11,.13);
+    border-top:1px solid rgba(245,158,11,.3);
+    border-right:1px solid rgba(245,158,11,.15);
+    border-bottom:1px solid rgba(245,158,11,.15);
+}
+.lb-task:hover { transform:scale(1.03) translateY(-1px); z-index:10; box-shadow:0 6px 22px rgba(0,0,0,.3); }
+.lb-task.done {
+    border-left-color:#22c55e;
+    background:rgba(34,197,94,.09);
+    border-top-color:rgba(34,197,94,.25);
+    opacity:.7;
+}
+.lb-task.submitted {
+    border-left-color:#22d3ee;
+    background:rgba(34,211,238,.09);
+    border-top-color:rgba(34,211,238,.25);
+    opacity:.8;
+}
+.lb-task-badge { font-family:var(--mono); font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#f59e0b; margin-bottom:2px; }
+.lb-task.done  .lb-task-badge { color:#22c55e; }
+.lb-task.submitted .lb-task-badge { color:#22d3ee; }
+.lb-task-title { font-size:11px; font-weight:700; line-height:1.3; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lb-task-time  { font-family:var(--mono); font-size:8px; color:#f59e0b; margin-top:auto; padding-top:2px; }
+.lb-task.done  .lb-task-time { color:#22c55e; }
 
 /* ══ MONTH VIEW ══ */
 .month-wrap { flex:1; overflow-y:auto; padding:14px 18px 20px; }
@@ -314,18 +410,42 @@ body::before {
     justify-content:center; border-radius:6px; flex-shrink:0;
 }
 .month-cell.is-today .cell-num { background:var(--accent); color:#fff; }
+
+/* lesson pill */
 .month-ev {
     font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
     transition:.12s; line-height:1.45; border-left-width:2px; border-left-style:solid;
 }
 .month-ev:hover { filter:brightness(1.2); transform:scale(1.02); }
+
+/* task pill */
+.month-task {
+    font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer;
+    transition:.12s; line-height:1.45;
+    border-left:2px solid #f59e0b;
+    background:rgba(245,158,11,.13); color:#f59e0b;
+    display:flex; align-items:center; gap:3px;
+}
+.month-task.done {
+    border-left-color:#22c55e;
+    background:rgba(34,197,94,.09);
+    color:#22c55e; opacity:.75;
+}
+.month-task.submitted {
+    border-left-color:#22d3ee;
+    background:rgba(34,211,238,.09);
+    color:#22d3ee; opacity:.85;
+}
+.month-task:hover { filter:brightness(1.18); transform:scale(1.02); }
+
 .month-more { font-family:var(--mono); font-size:9px; color:var(--muted); padding:1px 4px; cursor:pointer; transition:.14s; }
 .month-more:hover { color:var(--text); }
 
 /* ══ POPUP ══ */
 .popup {
-    display:none; position:fixed; z-index:300; width:272px;
+    display:none; position:fixed; z-index:300; width:280px;
     background:var(--card); border:1px solid var(--border);
     border-radius:14px; padding:15px;
     box-shadow:0 20px 50px rgba(0,0,0,.35);
@@ -342,17 +462,23 @@ body::before {
 .pop-row svg { width:11px; height:11px; flex-shrink:0; }
 .pop-row span { color:var(--text); }
 .pop-badge { display:inline-flex; padding:3px 9px; border-radius:99px; font-family:var(--mono); font-size:9px; font-weight:700; margin-top:5px; }
-.pop-badge.scheduled { background:rgba(99,102,241,.15); color:var(--accent); border:1px solid rgba(99,102,241,.3); }
-.pop-badge.completed { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.3); }
-.pop-badge.cancelled { background:rgba(239,68,68,.10); color:var(--red); border:1px solid rgba(239,68,68,.25); }
+.pop-badge.scheduled  { background:rgba(99,102,241,.15);  color:var(--accent); border:1px solid rgba(99,102,241,.3); }
+.pop-badge.completed  { background:rgba(34,197,94,.12);   color:var(--green);  border:1px solid rgba(34,197,94,.3); }
+.pop-badge.cancelled  { background:rgba(239,68,68,.10);   color:var(--red);    border:1px solid rgba(239,68,68,.25); }
+.pop-badge.hw-pending { background:rgba(245,158,11,.12);  color:var(--amber);  border:1px solid rgba(245,158,11,.3); }
+.pop-badge.hw-sent    { background:rgba(34,211,238,.12);  color:var(--teal);   border:1px solid rgba(34,211,238,.3); }
+.pop-badge.hw-done    { background:rgba(34,197,94,.12);   color:var(--green);  border:1px solid rgba(34,197,94,.3); }
+.pop-badge.hw-return  { background:rgba(239,68,68,.10);   color:var(--red);    border:1px solid rgba(239,68,68,.25); }
 .pop-actions { margin-top:10px; display:flex; gap:6px; }
 .pop-btn {
     flex:1; padding:7px; border-radius:8px; font-family:var(--font); font-size:11px;
     font-weight:700; cursor:pointer; transition:.14s; text-align:center; text-decoration:none;
     display:flex; align-items:center; justify-content:center; gap:4px; border:none;
 }
-.pop-join { background:linear-gradient(135deg,var(--accent),#818cf8); color:#fff; }
+.pop-join      { background:linear-gradient(135deg,var(--accent),#818cf8); color:#fff; }
 .pop-join:hover { opacity:.85; }
+.pop-hw        { background:linear-gradient(135deg,#f59e0b,#fbbf24); color:#000; font-weight:800; }
+.pop-hw:hover  { opacity:.88; }
 .pop-close-btn { background:var(--input-bg); color:var(--muted); border:1px solid var(--border) !important; }
 .pop-close-btn:hover { color:var(--text); border-color:rgba(99,102,241,.3) !important; }
 
@@ -365,9 +491,11 @@ body::before {
 .empty-title { font-size:14px; font-weight:800; color:var(--muted); }
 .empty-sub   { font-family:var(--mono); font-size:10px; color:var(--muted); line-height:1.7; max-width:240px; }
 
-/* ══ LIGHT THEME specifics for this page ══ */
+/* ══ LIGHT THEME ══ */
 body.light-theme .lb-title { color: #1e293b; }
+body.light-theme .lb-task-title { color: #1e293b; }
 body.light-theme .lb:hover { box-shadow: 0 6px 22px rgba(0,0,0,.12); }
+body.light-theme .lb-task:hover { box-shadow: 0 6px 22px rgba(0,0,0,.12); }
 body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
 
 @keyframes popIn { from{opacity:0;transform:scale(.93) translateY(4px)} to{opacity:1;transform:none} }
@@ -385,7 +513,7 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
     <div class="pop-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span id="popDate"></span></div>
     <div class="pop-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span id="popTime"></span></div>
     <div class="pop-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg><span id="popCourse"></span></div>
-    <div class="pop-row"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span id="popTeacher"></span></div>
+    <div class="pop-row" id="popRow4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span id="popExtra"></span></div>
     <span class="pop-badge" id="popStatus"></span>
     <div class="pop-actions" id="popActions"></div>
 </div>
@@ -422,7 +550,9 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
         </a>
         <a class="nav-item" href="homework_student.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Домашні завдання
-            <span class="nav-badge amber">!</span>
+            <?php if ($pendingTasks > 0): ?>
+            <span class="nav-badge amber"><?= $pendingTasks ?></span>
+            <?php endif; ?>
         </a>
         <a class="nav-item" href="chat.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Чат з викладачем
@@ -487,6 +617,7 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
         </div>
     </div>
 
+    <!-- STATS -->
     <div class="stats-strip">
         <div class="stat-chip c-purple">
             <span class="stat-chip-icon">📚</span>
@@ -502,13 +633,14 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
             <div><div class="stat-chip-val"><?= $upcomingLess ?></div><div class="stat-chip-lbl">Заплановано</div></div>
         </div>
         <div class="stat-chip c-amber">
-            <span class="stat-chip-icon">⏱</span>
-            <div><div class="stat-chip-val"><?= $totalMin>=60?round($totalMin/60,1).' год':$totalMin.' хв' ?></div>
-            <div class="stat-chip-lbl">Годин навчання</div></div>
+            <span class="stat-chip-icon">📋</span>
+            <div><div class="stat-chip-val"><?= $pendingTasks ?></div>
+            <div class="stat-chip-lbl">ДЗ до здачі</div></div>
         </div>
     </div>
 
     <?php if ($view === 'week'): ?>
+    <!-- ═══════════════ WEEK VIEW ═══════════════ -->
     <div class="cal-wrap">
         <div class="cal-header">
             <div class="time-gutter"></div>
@@ -548,38 +680,63 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
                     <div class="now-line" style="top:<?= round($nt) ?>px"><div class="now-dot"></div></div>
                     <?php endif; endif; ?>
 
-                    <?php foreach ($byDayIdx[$d] as $l):
-                        $dt  = new DateTime($l['scheduled_at']);
-                        $dur = 60;
-                        $top = ((int)$dt->format('H')*60+(int)$dt->format('i'))/60*$pxPerHour - $minHour*$pxPerHour;
-                        $ht  = $dur/60*$pxPerHour - 4;
-                        $col = $colorMap[$l['course_id']] ?? '#6366f1';
-                        $ld  = lessonJson($l, $colorMap);
+                    <?php foreach ($byDayIdx[$d] as $ev):
+                        if (($ev['_type'] ?? 'lesson') === 'task'):
+                            /* ── TASK block ── */
+                            $dt     = new DateTime($ev['deadline']);
+                            $top    = ((int)$dt->format('H')*60+(int)$dt->format('i'))/60*$pxPerHour - $minHour*$pxPerHour;
+                            $ht     = round($pxPerHour * 0.6);
+                            $isDone = $ev['sub_status'] === 'reviewed';
+                            $isSent = $ev['sub_status'] === 'submitted';
+                            $cls    = $isDone ? 'done' : ($isSent ? 'submitted' : '');
+                            $td     = taskJson($ev);
+                            $badge  = $isDone ? '✅ Оцінено' : ($isSent ? '🕐 Здано' : '📋 ДЗ');
+                    ?>
+                    <div class="lb-task <?= $cls ?>"
+                         style="top:<?= round($top) ?>px;height:<?= $ht ?>px"
+                         onclick="showTaskPopup(event,<?= htmlspecialchars($td,ENT_QUOTES) ?>)">
+                        <div class="lb-task-badge"><?= $badge ?></div>
+                        <div class="lb-task-title"><?= htmlspecialchars($ev['title']) ?></div>
+                        <?php if ($ht > 46): ?>
+                        <div class="lb-task-time">до <?= $dt->format('H:i') ?></div>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php else:
+                            /* ── LESSON block ── */
+                            $l   = $ev;
+                            $dt  = new DateTime($l['scheduled_at']);
+                            $dur = 60;
+                            $top = ((int)$dt->format('H')*60+(int)$dt->format('i'))/60*$pxPerHour - $minHour*$pxPerHour;
+                            $ht  = $dur/60*$pxPerHour - 4;
+                            $col = $colorMap[$l['course_id']] ?? '#6366f1';
+                            $ld  = lessonJson($l, $colorMap);
                     ?>
                     <div class="lb"
                          style="top:<?= round($top) ?>px;height:<?= round($ht) ?>px;background:<?= $col ?>18;border-left-color:<?= $col ?>;border-top:1px solid <?= $col ?>30;border-right:1px solid <?= $col ?>20;border-bottom:1px solid <?= $col ?>20"
-                         onclick="showPopup(event,<?= htmlspecialchars($ld,ENT_QUOTES) ?>)">
+                         onclick="showLessonPopup(event,<?= htmlspecialchars($ld,ENT_QUOTES) ?>)">
                         <div class="lb-lang" style="color:<?= $col ?>"><?= htmlspecialchars($l['lang_name']) ?></div>
                         <div class="lb-title"><?= htmlspecialchars($l['title']) ?></div>
                         <?php if ($ht>44): ?><div class="lb-sub"><?= htmlspecialchars(trim(($l['teacher_first']??'').' '.($l['teacher_last']??''))) ?></div><?php endif; ?>
                         <?php if ($ht>62): ?><div class="lb-time" style="color:<?= $col ?>"><?= $dt->format('H:i') ?> · <?= $dur ?> хв</div><?php endif; ?>
                     </div>
-                    <?php endforeach; ?>
+                    <?php endif; endforeach; ?>
                 </div>
                 <?php endfor; ?>
             </div>
         </div>
 
-        <?php if (empty($lessons)): ?>
+        <?php if (empty($byDayIdx[0]) && empty($byDayIdx[1]) && empty($byDayIdx[2]) && empty($byDayIdx[3]) && empty($byDayIdx[4]) && empty($byDayIdx[5]) && empty($byDayIdx[6])): ?>
         <div class="empty-state">
             <div class="empty-icon">🗓</div>
-            <div class="empty-title">Цього тижня занять немає</div>
-            <div class="empty-sub"><?= $weekOffset===0?'Запишіться на курси щоб бачити розклад':($weekOffset<0?'На цьому тижні занять не було':'Заняття ще не заплановані') ?></div>
+            <div class="empty-title">Цього тижня нічого немає</div>
+            <div class="empty-sub"><?= $weekOffset===0?'Запишіться на курси щоб бачити розклад':($weekOffset<0?'На цьому тижні нічого не було':'Заняття ще не заплановані') ?></div>
         </div>
         <?php endif; ?>
     </div>
 
     <?php else: ?>
+    <!-- ═══════════════ MONTH VIEW ═══════════════ -->
     <div class="month-wrap">
         <div class="month-grid-hd">
             <?php foreach ($UA_DAYS as $d): ?><div class="month-dh"><?= $d ?></div><?php endforeach; ?>
@@ -609,35 +766,49 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
             }
             $cellStr    = $cellDt->format('Y-m-d');
             $isToday    = $cellStr === $todayStr;
-            $dayLessons = $byDay[$cellStr] ?? [];
+            $dayEvents  = $byDay[$cellStr] ?? [];
         ?>
         <div class="month-cell<?= $otherMo?' other-month':'' ?><?= $isToday?' is-today':'' ?>">
             <div class="cell-num"><?= $cellDay ?></div>
-            <?php $shown = 0;
-            foreach ($dayLessons as $l):
+            <?php
+            $shown = 0;
+            foreach ($dayEvents as $ev):
                 if ($shown >= 3) break; $shown++;
-                $col = $colorMap[$l['course_id']] ?? '#6366f1';
-                $dt2 = new DateTime($l['scheduled_at']);
-                $ld  = lessonJson($l, $colorMap);
+                if (($ev['_type'] ?? 'lesson') === 'task'):
+                    $isDone = $ev['sub_status'] === 'reviewed';
+                    $isSent = $ev['sub_status'] === 'submitted';
+                    $cls    = $isDone ? 'done' : ($isSent ? 'submitted' : '');
+                    $td     = taskJson($ev);
+                    $dt2    = new DateTime($ev['deadline']);
+            ?>
+            <div class="month-task <?= $cls ?>"
+                 onclick="showTaskPopup(event,<?= htmlspecialchars($td,ENT_QUOTES) ?>)">
+                📋 <?= $dt2->format('H:i') ?> <?= htmlspecialchars(mb_substr($ev['title'],0,12)) ?>
+            </div>
+            <?php else:
+                    $l   = $ev;
+                    $col = $colorMap[$l['course_id']] ?? '#6366f1';
+                    $dt2 = new DateTime($l['scheduled_at']);
+                    $ld  = lessonJson($l, $colorMap);
             ?>
             <div class="month-ev"
                  style="background:<?= $col ?>1e;color:<?= $col ?>;border-left-color:<?= $col ?>"
-                 onclick="showPopup(event,<?= htmlspecialchars($ld,ENT_QUOTES) ?>)">
+                 onclick="showLessonPopup(event,<?= htmlspecialchars($ld,ENT_QUOTES) ?>)">
                 <?= $dt2->format('H:i') ?> <?= htmlspecialchars($l['title']) ?>
             </div>
-            <?php endforeach; ?>
-            <?php if (count($dayLessons)>3): ?>
-            <div class="month-more">+<?= count($dayLessons)-3 ?> ще</div>
+            <?php endif; endforeach; ?>
+            <?php if (count($dayEvents)>3): ?>
+            <div class="month-more">+<?= count($dayEvents)-3 ?> ще</div>
             <?php endif; ?>
         </div>
         <?php endfor; ?>
         </div>
 
-        <?php if (empty($lessons)): ?>
+        <?php if (empty($byDay)): ?>
         <div class="empty-state" style="margin-top:40px">
             <div class="empty-icon">🗓</div>
-            <div class="empty-title">Цього місяця занять немає</div>
-            <div class="empty-sub"><?= $monthOffset===0?'Запишіться на курси щоб бачити розклад':($monthOffset<0?'Цього місяця занять не було':'Заняття ще не заплановані') ?></div>
+            <div class="empty-title">Цього місяця нічого немає</div>
+            <div class="empty-sub"><?= $monthOffset===0?'Запишіться на курси щоб бачити розклад':($monthOffset<0?'Цього місяця нічого не було':'Заняття ще не заплановані') ?></div>
         </div>
         <?php endif; ?>
     </div>
@@ -647,23 +818,63 @@ body.light-theme .month-cell.is-today { background: rgba(79,70,229,.07); }
 <script>
 const popup = document.getElementById('popup');
 
-function showPopup(e, data) {
+/* ── Lesson popup ── */
+function showLessonPopup(e, data) {
     e.stopPropagation();
-    document.getElementById('popBar').style.background    = data.color;
-    document.getElementById('popTitle').textContent       = data.title;
-    document.getElementById('popDate').innerHTML          = `<span>${data.date}</span>`;
-    document.getElementById('popTime').innerHTML          = `<span>${data.start} — ${data.end} (${data.dur} хв)</span>`;
-    document.getElementById('popCourse').innerHTML        = `<span>${data.course}</span>`;
-    document.getElementById('popTeacher').innerHTML       = `<span>${data.teacher}</span>`;
+    document.getElementById('popBar').style.background = data.color;
+    document.getElementById('popTitle').textContent    = data.title;
+    document.getElementById('popDate').textContent     = data.date;
+    document.getElementById('popTime').textContent     = data.start + ' — ' + data.end + ' (' + data.dur + ' хв)';
+    document.getElementById('popCourse').textContent   = data.course;
+    document.getElementById('popExtra').textContent    = data.teacher;
+
     const sb = document.getElementById('popStatus');
     const labels = {scheduled:'Заплановано', completed:'Завершено', cancelled:'Скасовано'};
     sb.textContent = labels[data.status] || data.status;
     sb.className   = 'pop-badge ' + (data.status || 'scheduled');
+
     const acts = document.getElementById('popActions');
-    acts.innerHTML = (data.url && data.status === 'scheduled')
-        ? `<a class="pop-btn pop-join" href="${data.url}" target="_blank">📹 Приєднатись</a>` : '';
+    acts.innerHTML = '';
+    if (data.url && data.status === 'scheduled') {
+        acts.innerHTML += `<a class="pop-btn pop-join" href="${data.url}" target="_blank">📹 Приєднатись</a>`;
+    }
     acts.innerHTML += `<button class="pop-btn pop-close-btn" onclick="closePopup()">Закрити</button>`;
-    const vw=window.innerWidth, vh=window.innerHeight, pw=280, ph=310;
+
+    positionAndShow(e);
+}
+
+/* ── Task popup ── */
+function showTaskPopup(e, data) {
+    e.stopPropagation();
+
+    const statusCfg = {
+        pending:   { label: '⏳ Не здано',      cls: 'hw-pending', bar: '#f59e0b' },
+        submitted: { label: '🕐 На перевірці',  cls: 'hw-sent',    bar: '#22d3ee' },
+        reviewed:  { label: '✅ Оцінено',        cls: 'hw-done',    bar: '#22c55e' },
+        returned:  { label: '↩ Повернено',       cls: 'hw-return',  bar: '#ef4444' },
+    };
+    const sc = statusCfg[data.status] || statusCfg.pending;
+
+    document.getElementById('popBar').style.background = sc.bar;
+    document.getElementById('popTitle').textContent    = '📋 ' + data.title;
+    document.getElementById('popDate').textContent     = 'Дедлайн: ' + data.date + ' ' + data.time;
+    document.getElementById('popTime').textContent     = 'Макс. балів: ' + data.score;
+    document.getElementById('popCourse').textContent   = data.course;
+    document.getElementById('popExtra').textContent    = sc.label;
+
+    const sb = document.getElementById('popStatus');
+    sb.textContent = 'Домашнє завдання';
+    sb.className   = 'pop-badge ' + sc.cls;
+
+    const acts = document.getElementById('popActions');
+    acts.innerHTML = `<a class="pop-btn pop-hw" href="homework_student.php?task_id=${data.id}">📝 Перейти до завдання</a>`;
+    acts.innerHTML += `<button class="pop-btn pop-close-btn" onclick="closePopup()">Закрити</button>`;
+
+    positionAndShow(e);
+}
+
+function positionAndShow(e) {
+    const vw=window.innerWidth, vh=window.innerHeight, pw=285, ph=300;
     let x=e.clientX+14, y=e.clientY-20;
     if (x+pw>vw-10) x=e.clientX-pw-14;
     if (y+ph>vh-10) y=vh-ph-10;
@@ -674,6 +885,7 @@ function showPopup(e, data) {
 
 function closePopup() { popup.classList.remove('show'); }
 document.addEventListener('click', e => { if (!popup.contains(e.target)) closePopup(); });
+document.addEventListener('keydown', e => { if (e.key==='Escape') closePopup(); });
 
 document.addEventListener('DOMContentLoaded', () => {
     const body = document.getElementById('calBody');

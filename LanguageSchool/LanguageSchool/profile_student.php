@@ -11,7 +11,8 @@ $studentId = $_SESSION['user_id'];
 
 // Fetch student profile data
 $stmt = $pdo->prepare("
-    SELECT id, first_name, last_name, email, phone, avatar_url, created_at, last_activity
+    SELECT id, first_name, last_name, email, phone, avatar_url, created_at, last_activity,
+           birthdate, city, bio
     FROM users WHERE id = :id
 ");
 $stmt->execute(['id' => $studentId]);
@@ -22,11 +23,6 @@ $studentName = $fullName ?: 'Студент';
 
 $stmtStats = $pdo->prepare("
     SELECT
-        (SELECT COUNT(*) FROM enrollments WHERE student_id = :sid AND status = 'active') AS total_groups,
-        (SELECT COUNT(DISTINCT l.id)
-         FROM lessons l
-         JOIN enrollments e ON e.course_id = l.course_id
-         WHERE e.student_id = :sid AND e.status = 'active') AS total_lessons,
         (SELECT COUNT(DISTINCT la.lesson_id)
          FROM lesson_attendance la
          JOIN lessons l ON l.id = la.lesson_id
@@ -36,12 +32,12 @@ $stmtStats = $pdo->prepare("
         (SELECT COUNT(DISTINCT l.id)
          FROM lessons l
          JOIN enrollments e ON e.course_id = l.course_id
-         WHERE e.student_id = :sid AND e.status = 'active'
-           AND l.scheduled_at >= NOW()) AS upcoming_lessons
+         WHERE e.student_id = :sid AND e.status = 'active') AS total_lessons
 ");
 $stmtStats->execute(['sid' => $studentId]);
 $stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
-// Handle form submissions (avatar, profile update, etc)
+
+// Handle form submissions
 $successMsg = '';
 $errorMsg   = '';
 
@@ -78,6 +74,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 $successMsg         = 'Профіль успішно оновлено!';
             }
         }
+    }
+
+    /* -- Додаткова інформація -- */
+    if ($_POST['action'] === 'update_extra') {
+        $birthdate = trim($_POST['birthdate'] ?? '');
+        $city      = trim($_POST['city']      ?? '');
+        $bio       = trim($_POST['bio']       ?? '');
+
+        $pdo->prepare("
+            UPDATE users
+            SET birthdate=:bd, city=:c, bio=:b, updated_at=NOW()
+            WHERE id=:id
+        ")->execute(['bd' => $birthdate ?: null, 'c' => $city, 'b' => $bio, 'id' => $studentId]);
+
+        $user['birthdate'] = $birthdate;
+        $user['city']      = $city;
+        $user['bio']       = $bio;
+        $successMsg = 'Додаткову інформацію збережено!';
     }
 
     /* -- Зміна пароля -- */
@@ -130,14 +144,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 $pdo->prepare("UPDATE users SET last_activity=NOW() WHERE id=:id")
     ->execute(['id' => $studentId]);
 
-// Helper variables for template (initials, dates, attendance)
+// Helper variables
 $fn       = $user['first_name'] ?? '';
 $ln       = $user['last_name']  ?? '';
 $initials = strtoupper((substr($fn, 0, 1) ?: '') . (substr($ln, 0, 1) ?: '')) ?: 'S';
 $memberSince = !empty($user['created_at'])    ? (new DateTime($user['created_at']))->format('d.m.Y')         : '—';
 $lastActive  = !empty($user['last_activity']) ? (new DateTime($user['last_activity']))->format('d.m.Y, H:i') : '—';
 
-/* ─── Відсоток відвідуваності ─── */
+// Birthday display
+$birthdateDisplay = '—';
+if (!empty($user['birthdate'])) {
+    try {
+        $bd = new DateTime($user['birthdate']);
+        $birthdateDisplay = $bd->format('d.m.Y');
+    } catch (Exception $e) {}
+}
+
+/* Відсоток відвідуваності */
 $attendPct = ($stats['total_lessons'] > 0)
     ? round($stats['attended'] / $stats['total_lessons'] * 100)
     : 0;
@@ -163,6 +186,7 @@ $attendPct = ($stats['total_lessons'] > 0)
     --green:   #22c55e;
     --amber:   #f59e0b;
     --red:     #ef4444;
+    --pink:    #ec4899;
     --text:    #e2e8f0;
     --muted:   #64748b;
     --radius:  14px;
@@ -450,13 +474,12 @@ body::before {
     font-size: 13px; flex-shrink: 0;
 }
 
-.meta-info {}
 .meta-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
 .meta-value { font-size: 12px; font-weight: 600; margin-top: 1px; }
 
 /* ─ ATTENDANCE BAR ─ */
 .attend-wrap {
-    padding: 0 24px 20px;
+    padding: 0 24px 24px;
 }
 
 .attend-header {
@@ -485,35 +508,6 @@ body::before {
     transition: width 1s ease;
 }
 
-/* ─ STATS MINI ─ */
-.stats-mini {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 0 24px 24px;
-}
-
-.stat-mini {
-    background: rgba(34,211,238,.05);
-    border: 1px solid rgba(34,211,238,.12);
-    border-radius: 12px;
-    padding: 14px;
-    text-align: center;
-}
-
-.stat-mini-num {
-    font-size: 26px; font-weight: 800;
-    background: linear-gradient(135deg, var(--teal), #a5b4fc);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    line-height: 1;
-}
-
-.stat-mini-label {
-    font-family: var(--mono); font-size: 9px;
-    color: var(--muted); margin-top: 5px;
-    text-transform: uppercase; letter-spacing: .5px;
-}
-
 /* ─ RIGHT COLUMN ─ */
 .right-col {
     display: flex; flex-direction: column; gap: 20px;
@@ -530,6 +524,7 @@ body::before {
 
 .form-card:nth-child(2) { animation-delay: .06s; }
 .form-card:nth-child(3) { animation-delay: .12s; }
+.form-card:nth-child(4) { animation-delay: .18s; }
 
 .card-header {
     display: flex; align-items: center; gap: 12px;
@@ -545,9 +540,11 @@ body::before {
     font-size: 16px;
 }
 
-.card-header-icon.purple { background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.25); }
-.card-header-icon.amber  { background: rgba(245,158,11,.12); border: 1px solid rgba(245,158,11,.22); }
-.card-header-icon.red    { background: rgba(239,68,68,.10);  border: 1px solid rgba(239,68,68,.20); }
+.card-header-icon.purple { background: rgba(99,102,241,.15);  border: 1px solid rgba(99,102,241,.25); }
+.card-header-icon.amber  { background: rgba(245,158,11,.12);  border: 1px solid rgba(245,158,11,.22); }
+.card-header-icon.red    { background: rgba(239,68,68,.10);   border: 1px solid rgba(239,68,68,.20); }
+.card-header-icon.green  { background: rgba(34,197,94,.10);   border: 1px solid rgba(34,197,94,.22); }
+.card-header-icon.pink   { background: rgba(236,72,153,.10);  border: 1px solid rgba(236,72,153,.22); }
 
 .card-title { font-size: 15px; font-weight: 800; }
 .card-sub   { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
@@ -571,7 +568,8 @@ body::before {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
     width: 100%;
     background: rgba(255,255,255,.04);
     border: 1px solid var(--border);
@@ -581,16 +579,18 @@ body::before {
     font-family: var(--font); font-size: 13px;
     outline: none;
     transition: border-color .2s;
+    appearance: none;
 }
 
 .field textarea {
     resize: vertical;
-    min-height: 90px;
+    min-height: 100px;
     font-family: var(--font);
 }
 
 .field input:focus,
-.field textarea:focus {
+.field textarea:focus,
+.field select:focus {
     border-color: var(--teal);
     background: rgba(34,211,238,.04);
 }
@@ -598,15 +598,8 @@ body::before {
 .field input::placeholder,
 .field textarea::placeholder { color: var(--muted); }
 
-.field input.valid {
-    border-color: #22c55e;
-    background: rgba(34,197,94,.06);
-}
-
-.field input.invalid {
-    border-color: #ef4444;
-    background: rgba(239,68,68,.06);
-}
+.field input.valid  { border-color: #22c55e; background: rgba(34,197,94,.06); }
+.field input.invalid { border-color: #ef4444; background: rgba(239,68,68,.06); }
 
 .field-hint {
     display: block;
@@ -616,6 +609,14 @@ body::before {
 }
 
 .field-full { grid-column: 1/-1; }
+
+/* ─ SELECT wrapper ─ */
+.select-wrap { position: relative; }
+.select-wrap::after {
+    content: '▾';
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); pointer-events: none; font-size: 12px;
+}
 
 /* ─ BUTTON ─ */
 .btn-row {
@@ -640,6 +641,14 @@ body::before {
 
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(34,211,238,.35); }
 
+.btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+}
+
+.btn-ghost:hover { border-color: var(--teal); color: var(--teal); }
+
 /* ─ PASSWORD STRENGTH ─ */
 .pwd-strength {
     height: 4px; border-radius: 99px;
@@ -649,10 +658,8 @@ body::before {
 }
 
 .pwd-strength-bar {
-    height: 100%;
-    border-radius: 99px;
-    width: 0;
-    transition: width .3s, background .3s;
+    height: 100%; border-radius: 99px;
+    width: 0; transition: width .3s, background .3s;
 }
 
 /* ─ AVATAR UPLOAD ZONE ─ */
@@ -682,6 +689,13 @@ body::before {
 .avatar-drop-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .avatar-preview { display: none; width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; border: 3px solid var(--teal); }
 
+/* ─ BIO preview ─ */
+.bio-preview {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--muted); margin-top: 5px;
+    text-align: right;
+}
+
 /* ── ANIMATIONS ── */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(12px); }
@@ -692,7 +706,6 @@ body::before {
 @media(max-width:960px) {
     .content { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
-    .stats-mini { grid-template-columns: repeat(4,1fr); }
 }
 </style>
 </head>
@@ -712,9 +725,11 @@ body::before {
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>
 
-    <div class="sidebar-bottom">        <button class="theme-toggle" title="Змінити тему" style="width:100%;margin-bottom:8px;padding:8px">
+    <div class="sidebar-bottom">
+        <button class="theme-toggle" title="Змінити тему" style="width:100%;margin-bottom:8px;padding:8px">
             <span class="theme-toggle-icon">☀️</span>
-        </button>        <a class="logout-side" href="logout.php">🚪 Вийти</a>
+        </button>
+        <a class="logout-side" href="logout.php">🚪 Вийти</a>
     </div>
 </aside>
 
@@ -784,6 +799,24 @@ body::before {
                             </div>
                         </div>
                         <?php endif; ?>
+                        <?php if ($birthdateDisplay !== '—'): ?>
+                        <div class="meta-row">
+                            <div class="meta-icon">🎂</div>
+                            <div class="meta-info">
+                                <div class="meta-label">День народження</div>
+                                <div class="meta-value"><?= $birthdateDisplay ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                        <?php if (!empty($user['city'])): ?>
+                        <div class="meta-row">
+                            <div class="meta-icon">📍</div>
+                            <div class="meta-info">
+                                <div class="meta-label">Місто</div>
+                                <div class="meta-value"><?= htmlspecialchars($user['city']) ?></div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -798,25 +831,7 @@ body::before {
                     </div>
                 </div>
 
-                <div class="stats-mini">
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['total_groups'] ?></div>
-                        <div class="stat-mini-label">Груп</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['total_lessons'] ?></div>
-                        <div class="stat-mini-label">Уроків</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['attended'] ?></div>
-                        <div class="stat-mini-label">Відвідано</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['upcoming_lessons'] ?></div>
-                        <div class="stat-mini-label">Заплановано</div>
-                    </div>
-                </div>
-            </div>
+            </div><!-- /profile-card -->
         </div>
 
         <!-- ── RIGHT: FORMS ── -->
@@ -856,6 +871,46 @@ body::before {
                         </div>
                         <div class="btn-row">
                             <button type="submit" class="btn btn-primary">💾 Зберегти зміни</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Форма: Додаткова інформація (НОВА) -->
+            <div class="form-card">
+                <div class="card-header">
+                    <div class="card-header-icon green">🌿</div>
+                    <div>
+                        <div class="card-title">Додаткова інформація</div>
+                        <div class="card-sub">День народження, місто та коротко про себе</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <input type="hidden" name="action" value="update_extra">
+                        <div class="form-grid">
+                            <div class="field">
+                                <label>День народження</label>
+                                <input type="date" name="birthdate"
+                                       value="<?= htmlspecialchars($user['birthdate'] ?? '') ?>"
+                                       max="<?= date('Y-m-d') ?>">
+                            </div>
+                            <div class="field">
+                                <label>Місто</label>
+                                <input type="text" name="city"
+                                       value="<?= htmlspecialchars($user['city'] ?? '') ?>"
+                                       placeholder="Київ">
+                            </div>
+                            <div class="field field-full">
+                                <label>Про себе</label>
+                                <textarea name="bio" id="bioInput" maxlength="300"
+                                          placeholder="Кілька слів про тебе — цілі навчання, хобі, інтереси…"><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
+                                <div class="bio-preview"><span id="bioCount">0</span> / 300</div>
+                            </div>
+                        </div>
+                        <div class="btn-row">
+                            <button type="submit" class="btn btn-primary">💾 Зберегти</button>
+                            <button type="reset" class="btn btn-ghost" onclick="updateBioCount()">↺ Скинути</button>
                         </div>
                     </form>
                 </div>
@@ -932,6 +987,20 @@ body::before {
 (function(){
     const opt = { day:'numeric', month:'long', year:'numeric', weekday:'long' };
     document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('uk-UA', opt);
+})();
+
+/* Bio counter */
+function updateBioCount() {
+    const ta  = document.getElementById('bioInput');
+    const cnt = document.getElementById('bioCount');
+    if (ta && cnt) cnt.textContent = ta.value.length;
+}
+(function(){
+    const ta = document.getElementById('bioInput');
+    if (ta) {
+        updateBioCount();
+        ta.addEventListener('input', updateBioCount);
+    }
 })();
 
 /* Password strength */

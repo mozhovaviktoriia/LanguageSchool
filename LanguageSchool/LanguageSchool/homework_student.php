@@ -21,6 +21,7 @@ $flashSuccess = '';
 $flashError   = '';
 if (isset($_GET['ok']))  $flashSuccess = 'Роботу успішно здано!';
 if (isset($_GET['err'])) $flashError   = htmlspecialchars($_GET['err']);
+if (isset($_GET['cancelled'])) $flashSuccess = 'Відправлення скасовано. Можете відредагувати відповідь.';
 
 /* ── Handle POST: submit answer ── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -90,6 +91,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $flashError = 'Завдання не знайдено або недоступне.';
         }
+    }
+
+    if ($action === 'cancel' && $taskId) {
+        $cancel = $pdo->prepare("
+            UPDATE task_submissions
+            SET status = 'assigned'
+            WHERE task_id = :tid AND student_id = :sid AND status = 'submitted'
+        ");
+        $cancel->execute(['tid' => $taskId, 'sid' => $studentId]);
+        header("Location: homework_student.php?task_id=" . urlencode($taskId) . "&cancelled=1");
+        exit;
     }
 }
 
@@ -613,6 +625,16 @@ body.light-theme .topbar { background: rgba(241,245,249,.95) !important; border-
                 <div class="result-card pending">
                     <div style="font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px">⏳ Робота здана, очікує перевірки</div>
                     <div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Здано: <?= $activeTask['submitted_at'] ? (new DateTime($activeTask['submitted_at']))->format('d.m.Y H:i') : '' ?></div>
+                    <form method="POST" style="margin-top:12px">
+                        <input type="hidden" name="action"  value="cancel">
+                        <input type="hidden" name="task_id" value="<?= htmlspecialchars($activeTask['id']) ?>">
+                        <button type="submit" onclick="return confirmCancel()"
+                                style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:9px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:var(--amber);font-family:var(--font);font-size:12px;font-weight:700;cursor:pointer;transition:.2s"
+                                onmouseover="this.style.background='rgba(245,158,11,.22)'"
+                                onmouseout="this.style.background='rgba(245,158,11,.12)'">
+                            ↩ Скасувати відправлення
+                        </button>
+                    </form>
                 </div>
                 <?php endif; ?>
 
@@ -686,6 +708,9 @@ function showFile(input) {
         area.classList.add('has-file');
         name.textContent = '✓ ' + input.files[0].name;
     }
+}
+function confirmCancel() {
+    return confirm('Скасувати відправлення? Ваша відповідь збережеться, і ви зможете її відредагувати.');
 }
 </script>
 <script src="theme-switcher.js"></script>

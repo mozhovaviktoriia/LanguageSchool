@@ -92,6 +92,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $flashError = 'Відповідь не знайдена.';
         }
     }
+    if ($action === 'reassign' && $submissionId) {
+    $chk = $pdo->prepare("
+        SELECT ts.id FROM task_submissions ts
+        JOIN tasks t ON ts.task_id = t.id
+        WHERE ts.id = :sid AND t.id = :tid AND t.created_by = :teacher
+    ");
+    $chk->execute(['sid' => $submissionId, 'tid' => $taskId, 'teacher' => $teacherId]);
+
+    if ($chk->fetch()) {
+        $pdo->prepare("
+            UPDATE task_submissions
+            SET status      = 'assigned'::task_status,
+                score       = NULL,
+                feedback    = NULL,
+                reviewed_by = NULL,
+                reviewed_at = NULL
+            WHERE id = :sid
+        ")->execute(['sid' => $submissionId]);
+        $flashSuccess = 'Завдання відправлено учню повторно.';
+    } else {
+        $flashError = 'Відповідь не знайдена.';
+    }
+}
     header("Location: homework.php?task_id=" . urlencode($taskId) .
            ($flashSuccess ? '&ok=1' : '&err=' . urlencode($flashError)));
     exit;
@@ -125,18 +148,26 @@ $returnedSubs = count(array_filter($submissions, fn($s) => $s['status'] === 'ass
 $scores       = array_filter(array_column($submissions, 'score'), fn($v) => $v !== null);
 $avgScore     = $scores ? round(array_sum($scores) / count($scores), 1) : null;
 
-/* Active submission from URL */
 $activeSubId = (int)($_GET['sub'] ?? 0);
 if (!$activeSubId && $pendingSubs > 0) {
     foreach ($submissions as $s) {
         if ($s['status'] === 'submitted') { $activeSubId = $s['id']; break; }
     }
 }
+// Якщо не вибрано — автоматично відкриваємо першу відповідь
+if (!$activeSubId && !empty($submissions)) {
+    $activeSubId = $submissions[0]['id'];
+}
 
-/* Active submission data */
+// Find the active submission data
 $activeSub = null;
-foreach ($submissions as $s) {
-    if ($s['id'] == $activeSubId) { $activeSub = $s; break; }
+if ($activeSubId) {
+    foreach ($submissions as $s) {
+        if ($s['id'] == $activeSubId) {
+            $activeSub = $s;
+            break;
+        }
+    }
 }
 
 /* helpers */
@@ -310,6 +341,28 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
 .btn-save:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(99,102,241,.4); }
 .btn-return { display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; border-radius:11px; background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25); color:#fca5a5; font-family:var(--font); font-size:12px; font-weight:700; cursor:pointer; transition:.2s; }
 .btn-return:hover { background:rgba(239,68,68,.16); border-color:rgba(239,68,68,.5); }
+.btn-reassign {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 11px;
+    background: rgba(99,102,241,.07);
+    border: 1px dashed rgba(99,102,241,.35);
+    color: #a5b4fc;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: .2s;
+}
+.btn-reassign:hover {
+    background: rgba(99,102,241,.15);
+    border-color: rgba(99,102,241,.6);
+    border-style: solid;
+}
 
 /* Previous score display */
 .prev-score-block { padding:12px 14px; background:rgba(34,197,94,.06); border:1px solid rgba(34,197,94,.18); border-radius:10px; margin-bottom:16px; }
@@ -683,6 +736,22 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
                     </button>
                 </div>
             </form>
+            <?php if ($activeSub['status'] === 'reviewed'): ?>
+<div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
+    <div style="font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+        Повторна спроба
+    </div>
+    <form method="POST"
+          action="homework.php?task_id=<?= urlencode($taskId) ?>&sub=<?= $activeSub['id'] ?>">
+        <input type="hidden" name="action"        value="reassign">
+        <input type="hidden" name="submission_id" value="<?= $activeSub['id'] ?>">
+        <button type="submit" class="btn-reassign"
+                onclick="return confirm('Скинути оцінку і дати завдання повторно?\n\nУчень зможе здати знову.')">
+            🔄 Дати завдання повторно
+        </button>
+    </form>
+</div>
+<?php endif; ?>
             <?php endif; ?>
         </div>
 

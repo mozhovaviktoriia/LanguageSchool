@@ -92,6 +92,10 @@ $stmtStats = $pdo->prepare("
         COUNT(CASE WHEN ts.score IS NOT NULL THEN 1 END) AS graded_count,
         ROUND(AVG(ts.score), 1) AS avg_score
     FROM task_submissions ts
+    JOIN tasks t ON t.id = ts.task_id
+    JOIN enrollments e ON e.course_id = t.course_id
+        AND e.student_id = :s
+        AND e.status = 'active'
     WHERE ts.student_id = :s
 ");
 $stmtStats->execute([':s' => $studentId]);
@@ -314,6 +318,11 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
         <a class="nav-item active" href="dashboard_student.php">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             Дашборд
+        </a>
+
+        <a class="nav-item" href="courses_catalog.php">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+           Каталог курсів
         </a>
 
         <a class="nav-item" href="schedule_student.php">

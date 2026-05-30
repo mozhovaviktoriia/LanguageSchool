@@ -9,7 +9,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
 
 $teacherId = $_SESSION['user_id'];
 
-// Fetch teacher profile data
 $stmt = $pdo->prepare("
     SELECT id, first_name, last_name, email, phone, avatar_url, created_at, last_activity
     FROM users WHERE id = :id
@@ -20,32 +19,6 @@ $user = $stmt->fetch(PDO::FETCH_ASSOC);
 $fullName    = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
 $teacherName = $fullName ?: 'Викладач';
 
-// Fetch teacher statistics (courses, students, lessons)
-$stmtStats = $pdo->prepare("
-    SELECT
-        (SELECT COUNT(DISTINCT course_id)
-         FROM lessons
-         WHERE teacher_id = :tid) AS total_groups,
-
-        (SELECT COUNT(DISTINCT e.student_id)
-         FROM enrollments e
-         JOIN lessons l ON l.course_id = e.course_id
-         WHERE l.teacher_id = :tid
-           AND e.status = 'active') AS total_students,
-
-        (SELECT COUNT(*)
-         FROM lessons
-         WHERE teacher_id = :tid) AS total_lessons,
-
-        (SELECT COUNT(*)
-         FROM lessons
-         WHERE teacher_id = :tid
-           AND scheduled_at >= NOW()) AS upcoming_lessons
-");
-$stmtStats->execute(['tid' => $teacherId]);
-$stats = $stmtStats->fetch(PDO::FETCH_ASSOC);
-
-// Handle form submissions (avatar, profile update, etc)
 $successMsg = '';
 $errorMsg   = '';
 
@@ -128,13 +101,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $successMsg = 'Аватар оновлено!';
         }
     }
+
+    /* -- Очистити курс (видалити всі ДЗ і заняття) -- */
+    if ($_POST['action'] === 'clear_course') {
+        try {
+            $pdo->beginTransaction();
+
+            // Видалити всі submissions для tasks викладача
+            $pdo->prepare("
+                DELETE FROM task_submissions
+                WHERE task_id IN (
+                    SELECT t.id FROM tasks t
+                    LEFT JOIN lessons l ON t.lesson_id = l.id
+                    LEFT JOIN courses c ON c.id = COALESCE(l.course_id, t.course_id)
+                    WHERE c.teacher_id = :tid
+                )
+            ")->execute(['tid' => $teacherId]);
+
+            // Видалити всі tasks викладача
+            $pdo->prepare("
+                DELETE FROM tasks
+                WHERE id IN (
+                    SELECT t.id FROM tasks t
+                    LEFT JOIN lessons l ON t.lesson_id = l.id
+                    LEFT JOIN courses c ON c.id = COALESCE(l.course_id, t.course_id)
+                    WHERE c.teacher_id = :tid
+                )
+            ")->execute(['tid' => $teacherId]);
+
+            // Видалити lesson_students
+            $pdo->prepare("
+                DELETE FROM lesson_students
+                WHERE lesson_id IN (
+                    SELECT id FROM lessons WHERE teacher_id = :tid
+                )
+            ")->execute(['tid' => $teacherId]);
+
+            // Видалити всі заняття з розкладу
+            $pdo->prepare("DELETE FROM lessons WHERE teacher_id = :tid")
+                ->execute(['tid' => $teacherId]);
+
+            $pdo->commit();
+            $successMsg = 'Всі завдання та заняття з розкладу видалено.';
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            $errorMsg = 'Помилка при очищенні: ' . $e->getMessage();
+        }
+    }
+
+    /* -- Деактивація акаунту -- */
+    if ($_POST['action'] === 'deactivate_account') {
+        $pdo->prepare("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE id = :id")
+            ->execute(['id' => $teacherId]);
+        session_destroy();
+        header('Location: login.php?deactivated=1');
+        exit;
+    }
 }
 
-// Update last activity timestamp
 $pdo->prepare("UPDATE users SET last_activity=NOW() WHERE id=:id")
     ->execute(['id' => $teacherId]);
 
-// Helper variables for template (initials, dates)
 $fn       = $user['first_name'] ?? '';
 $ln       = $user['last_name']  ?? '';
 $initials = strtoupper((substr($fn, 0, 1) ?: '') . (substr($ln, 0, 1) ?: '')) ?: 'T';
@@ -147,7 +174,6 @@ $lastActive  = !empty($user['last_activity']) ? (new DateTime($user['last_activi
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Профіль | LinguaSchool</title>
-</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link href="theme.css" rel="stylesheet">
 <style>
@@ -303,7 +329,7 @@ body::before {
     padding: 32px;
     flex: 1;
     display: grid;
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 300px 1fr;
     gap: 24px;
     align-items: start;
 }
@@ -436,34 +462,70 @@ body::before {
 .meta-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
 .meta-value { font-size: 12px; font-weight: 600; margin-top: 1px; }
 
-/* ─ STATS MINI ─ */
-.stats-mini {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    padding: 0 24px 24px;
+/* ─ DANGER ZONE (в profile-card) ─ */
+.danger-zone {
+    padding: 20px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
 }
 
-.stat-mini {
-    background: rgba(99,102,241,.06);
-    border: 1px solid rgba(99,102,241,.15);
-    border-radius: 12px;
-    padding: 14px;
-    text-align: center;
+.danger-zone-title {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 2px;
 }
 
-.stat-mini-num {
-    font-size: 26px; font-weight: 800;
-    background: linear-gradient(135deg, #a5b4fc, var(--teal));
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    line-height: 1;
+.btn-danger-action {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 11px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 700;
+    transition: .2s;
+    text-align: left;
 }
 
-.stat-mini-label {
-    font-family: var(--mono); font-size: 9px;
-    color: var(--muted); margin-top: 5px;
-    text-transform: uppercase; letter-spacing: .5px;
+.btn-clear {
+    background: rgba(245,158,11,.08);
+    border: 1px solid rgba(245,158,11,.2) !important;
+    color: #fbbf24;
 }
+.btn-clear:hover {
+    background: rgba(245,158,11,.16);
+    border-color: rgba(245,158,11,.4) !important;
+    transform: translateY(-1px);
+}
+
+.btn-deactivate {
+    background: rgba(239,68,68,.08);
+    border: 1px solid rgba(239,68,68,.2) !important;
+    color: #fca5a5;
+}
+.btn-deactivate:hover {
+    background: rgba(239,68,68,.16);
+    border-color: rgba(239,68,68,.4) !important;
+    transform: translateY(-1px);
+}
+
+.btn-danger-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.btn-danger-text {}
+.btn-danger-label { font-size: 12px; font-weight: 700; }
+.btn-danger-sub   { font-family: var(--mono); font-size: 9px; opacity: .7; margin-top: 1px; }
 
 /* ─ RIGHT COLUMN ─ */
 .right-col {
@@ -514,7 +576,6 @@ body::before {
 
 .form-grid.single { grid-template-columns: 1fr; }
 
-
 .field label {
     display: block;
     font-family: var(--mono); font-size: 10px;
@@ -550,26 +611,13 @@ body::before {
 .field input::placeholder,
 .field textarea::placeholder { color: var(--muted); }
 
-.field input.valid {
-    border-color: #22c55e;
-    background: rgba(34,197,94,.06);
-}
-
-.field input.invalid {
-    border-color: #ef4444;
-    background: rgba(239,68,68,.06);
-}
-
-.field-hint {
-    display: block;
-    font-family: var(--mono); font-size: 9px;
-    color: #ff5252; margin-top: 5px;
-    min-height: 16px;
-}
+.field input.valid   { border-color: #22c55e; background: rgba(34,197,94,.06); }
+.field input.invalid { border-color: #ef4444; background: rgba(239,68,68,.06); }
 
 .field-hint {
     font-family: var(--mono); font-size: 9px;
     color: var(--muted); margin-top: 5px;
+    min-height: 16px;
 }
 
 .field-full { grid-column: 1/-1; }
@@ -596,14 +644,6 @@ body::before {
 }
 
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(99,102,241,.4); }
-
-.btn-danger {
-    background: rgba(239,68,68,.12);
-    border: 1px solid rgba(239,68,68,.25);
-    color: #fca5a5;
-}
-
-.btn-danger:hover { background: rgba(239,68,68,.22); border-color: rgba(239,68,68,.5); }
 
 /* ─ PASSWORD STRENGTH ─ */
 .pwd-strength {
@@ -647,21 +687,89 @@ body::before {
 .avatar-drop-sub { font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .avatar-preview { display: none; width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin: 0 auto 12px; border: 3px solid var(--accent); }
 
+/* ── CONFIRM MODAL ── */
+.confirm-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+.confirm-overlay.show { display: flex; }
+.confirm-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    animation: fadeUp .2s ease;
+    box-shadow: 0 24px 60px rgba(0,0,0,.7);
+}
+.confirm-icon { font-size: 44px; margin-bottom: 14px; }
+.confirm-title { font-size: 17px; font-weight: 800; margin-bottom: 8px; }
+.confirm-desc {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); line-height: 1.7;
+    margin-bottom: 24px;
+}
+.confirm-desc strong { color: var(--text); }
+.confirm-actions { display: flex; gap: 10px; }
+.confirm-cancel {
+    flex: 1; padding: 11px; border-radius: 10px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid var(--border);
+    color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: .18s;
+}
+.confirm-cancel:hover { color: var(--text); border-color: rgba(99,102,241,.4); }
+.confirm-ok {
+    flex: 1; padding: 11px; border-radius: 10px;
+    border: none; font-family: var(--font); font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: .18s;
+}
+.confirm-ok.amber { background: linear-gradient(135deg, #f59e0b, #fbbf24); color: #000; }
+.confirm-ok.amber:hover { opacity: .88; }
+.confirm-ok.red   { background: linear-gradient(135deg, #ef4444, #f87171); color: #fff; }
+.confirm-ok.red:hover { opacity: .88; }
+
 /* ── ANIMATIONS ── */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── RESPONSIVE ── */
 @media(max-width:960px) {
     .content { grid-template-columns: 1fr; }
     .form-grid { grid-template-columns: 1fr; }
-    .stats-mini { grid-template-columns: repeat(4,1fr); }
 }
 </style>
 </head>
 <body>
+
+<!-- ════ CONFIRM MODAL ════ -->
+<div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-box">
+        <div class="confirm-icon" id="confirmIcon"></div>
+        <div class="confirm-title" id="confirmTitle"></div>
+        <div class="confirm-desc" id="confirmDesc"></div>
+        <div class="confirm-actions">
+            <button class="confirm-cancel" onclick="closeConfirm()">Скасувати</button>
+            <button class="confirm-ok" id="confirmOk" onclick="submitConfirm()"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden forms for dangerous actions -->
+<form id="formClear" method="POST" style="display:none">
+    <input type="hidden" name="action" value="clear_course">
+</form>
+<form id="formDeactivate" method="POST" style="display:none">
+    <input type="hidden" name="action" value="deactivate_account">
+</form>
 
 <!-- ════ SIDEBAR ════ -->
 <aside class="sidebar">
@@ -671,9 +779,9 @@ body::before {
     </div>
 
     <span class="nav-label">Меню</span>
-    <a class="nav-item" href="teacher.php"><span class="nav-icon">📚</span> Мої курси</a>
+    <a class="nav-item" href="dashboard_teacher.php"><span class="nav-icon">📚</span> Мої курси</a>
     <a class="nav-item" href="students.php"><span class="nav-icon">👨‍🎓</span> Мої учні</a>
-    <a class="nav-item" href="schedule.php"><span class="nav-icon">📅</span> Розклад</a>
+    <a class="nav-item" href="schedule_teacher.php"><span class="nav-icon">📅</span> Розклад</a>
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>
 
@@ -688,7 +796,6 @@ body::before {
 <!-- ════ PAGE ════ -->
 <div class="page">
 
-    <!-- TOPBAR -->
     <div class="topbar">
         <a class="topbar-back" href="dashboard_teacher.php">← Назад</a>
         <div class="topbar-title">Профіль викладача</div>
@@ -697,7 +804,6 @@ body::before {
 
     <div class="content">
 
-        <!-- ALERTS -->
         <?php if ($successMsg): ?>
         <div class="alert success">✅ <?= htmlspecialchars($successMsg) ?></div>
         <?php endif; ?>
@@ -754,23 +860,27 @@ body::before {
                     </div>
                 </div>
 
-                <div class="stats-mini">
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['total_groups'] ?></div>
-                        <div class="stat-mini-label">Груп</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['total_students'] ?></div>
-                        <div class="stat-mini-label">Учнів</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['total_lessons'] ?></div>
-                        <div class="stat-mini-label">Уроків</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-num"><?= (int)$stats['upcoming_lessons'] ?></div>
-                        <div class="stat-mini-label">Заплановано</div>
-                    </div>
+                <!-- DANGER ZONE -->
+                <div class="danger-zone">
+                    <div class="danger-zone-title">⚠ Небезпечна зона</div>
+
+                    <button class="btn-danger-action btn-clear"
+                            onclick="openConfirm('clear')">
+                        <span class="btn-danger-icon">🗑️</span>
+                        <div class="btn-danger-text">
+                            <div class="btn-danger-label">Очистити курс</div>
+                            <div class="btn-danger-sub">Видалити всі ДЗ та заняття</div>
+                        </div>
+                    </button>
+
+                    <button class="btn-danger-action btn-deactivate"
+                            onclick="openConfirm('deactivate')">
+                        <span class="btn-danger-icon">🚫</span>
+                        <div class="btn-danger-text">
+                            <div class="btn-danger-label">Деактивувати акаунт</div>
+                            <div class="btn-danger-sub">Вимкнути доступ до системи</div>
+                        </div>
+                    </button>
                 </div>
             </div>
         </div>
@@ -778,7 +888,7 @@ body::before {
         <!-- ── RIGHT: FORMS ── -->
         <div class="right-col">
 
-            <!-- Форма: Особисті дані -->
+            <!-- Особисті дані -->
             <div class="form-card">
                 <div class="card-header">
                     <div class="card-header-icon purple">👤</div>
@@ -809,7 +919,6 @@ body::before {
                                 <input type="text" id="profilePhoneInput" name="phone" value="<?= htmlspecialchars($user['phone'] ?? '') ?>" placeholder="+380 xx xxx xx xx">
                                 <div class="field-hint" id="profilePhoneHint"></div>
                             </div>
-
                         </div>
                         <div class="btn-row">
                             <button type="submit" class="btn btn-primary">💾 Зберегти зміни</button>
@@ -818,7 +927,7 @@ body::before {
                 </div>
             </div>
 
-            <!-- Форма: Зміна пароля -->
+            <!-- Зміна пароля -->
             <div class="form-card">
                 <div class="card-header">
                     <div class="card-header-icon amber">🔐</div>
@@ -853,7 +962,7 @@ body::before {
                 </div>
             </div>
 
-            <!-- Форма: Аватар -->
+            <!-- Фото профілю -->
             <div class="form-card">
                 <div class="card-header">
                     <div class="card-header-icon red">🖼️</div>
@@ -879,10 +988,9 @@ body::before {
                 </div>
             </div>
 
-        </div><!-- /right-col -->
-
-    </div><!-- /content -->
-</div><!-- /page -->
+        </div>
+    </div>
+</div>
 
 <script>
 /* Date */
@@ -901,12 +1009,11 @@ function checkStrength(val) {
     if (/[A-Z]/.test(val)) score++;
     if (/[0-9]/.test(val)) score++;
     if (/[^A-Za-z0-9]/.test(val)) score++;
-
     const colors = ['#ef4444','#f59e0b','#f59e0b','#22c55e','#22c55e'];
     const labels = ['Дуже слабкий','Слабкий','Середній','Сильний','Дуже сильний'];
-    bar.style.width   = (score * 20) + '%';
+    bar.style.width      = (score * 20) + '%';
     bar.style.background = colors[score - 1] || '#1e293b';
-    hint.textContent  = val.length ? labels[score - 1] || '' : 'Введіть новий пароль';
+    hint.textContent     = val.length ? labels[score - 1] || '' : 'Введіть новий пароль';
 }
 
 /* Avatar preview */
@@ -923,16 +1030,15 @@ function previewAvatar(input) {
     reader.readAsDataURL(input.files[0]);
 }
 
-/* Drag-over style */
+/* Drag-over */
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const dt = e.dataTransfer;
-    if (dt.files.length) {
-        document.getElementById('quickAvatarInput').files = dt.files;
+    if (e.dataTransfer.files.length) {
+        document.getElementById('quickAvatarInput').files = e.dataTransfer.files;
         previewAvatar(document.getElementById('quickAvatarInput'));
     }
 });
@@ -946,11 +1052,10 @@ setTimeout(() => {
     });
 }, 4000);
 
-/* Валідація email та телефону */
+/* Validate */
 function validatePhoneJS(val) {
     return /^\+?3?8?(0\d{9})$/.test(val.replace(/[\s\-()]/g, ''));
 }
-
 function validateEmailJS(val) {
     return /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,6}$/.test(val) && val.length <= 100;
 }
@@ -986,6 +1091,58 @@ if (profileEmailInput) {
         }
     });
 }
+
+/* ── Confirm modal ── */
+let pendingAction = null;
+
+const confirmCfg = {
+    clear: {
+        icon:  '🗑️',
+        title: 'Очистити курс?',
+        desc:  'Буде видалено <strong>всі домашні завдання</strong> та <strong>заняття з розкладу</strong> для вашого акаунту. Цю дію неможливо відмінити.',
+        btnText: 'Так, видалити',
+        btnCls:  'amber',
+        form:    'formClear',
+    },
+    deactivate: {
+        icon:  '🚫',
+        title: 'Деактивувати акаунт?',
+        desc:  'Ваш акаунт буде <strong>вимкнено</strong>. Студенти не зможуть бачити ваші курси. Для відновлення зверніться до адміністратора.',
+        btnText: 'Деактивувати',
+        btnCls:  'red',
+        form:    'formDeactivate',
+    },
+};
+
+function openConfirm(action) {
+    const cfg = confirmCfg[action];
+    pendingAction = action;
+    document.getElementById('confirmIcon').textContent  = cfg.icon;
+    document.getElementById('confirmTitle').textContent = cfg.title;
+    document.getElementById('confirmDesc').innerHTML    = cfg.desc;
+    const ok = document.getElementById('confirmOk');
+    ok.textContent = cfg.btnText;
+    ok.className   = 'confirm-ok ' + cfg.btnCls;
+    document.getElementById('confirmOverlay').classList.add('show');
+}
+
+function closeConfirm() {
+    pendingAction = null;
+    document.getElementById('confirmOverlay').classList.remove('show');
+}
+
+function submitConfirm() {
+    if (!pendingAction) return;
+    document.getElementById(confirmCfg[pendingAction].form).submit();
+}
+
+document.getElementById('confirmOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeConfirm();
+});
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeConfirm();
+});
 </script>
 <script src="theme-switcher.js"></script>
 </body>

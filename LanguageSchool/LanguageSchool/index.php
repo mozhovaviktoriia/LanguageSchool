@@ -262,7 +262,7 @@ header nav a:hover { color: var(--nav-hover); }
     position: absolute;
     inset: 0;
     background: var(--hero-overlay);
-    transition: background .5s ease;
+    transition: background .15s ease;
 }
 
 .hero-content {
