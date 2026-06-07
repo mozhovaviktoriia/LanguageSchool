@@ -61,4 +61,3 @@ if (!function_exists('safe_strtolower')) {
         return strtolower($string);
     }
 }
-?>

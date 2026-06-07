@@ -43,7 +43,7 @@ if ($role === 'student') {
         FROM enrollments e
         JOIN courses c ON c.id = e.course_id
         JOIN users u ON u.id = c.teacher_id
-        WHERE e.student_id = :me AND e.status IN ('active','pending')
+        WHERE e.student_id = :me AND e.status = 'active'
         ORDER BY u.last_name, u.first_name
     ");
     $stPeers->execute([':me' => $me]);
@@ -322,6 +322,17 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 .tick.read { color:var(--teal); }
 .tick.sent { color:var(--muted); }
 
+/* ── Message actions menu ── */
+.msg-actions { position:absolute; right:0; top:0; background:var(--card); border:1px solid var(--border);
+    border-radius:8px; display:flex; gap:2px; padding:4px; opacity:0; pointer-events:none;
+    transition:opacity .15s; z-index:10; }
+.msg-row:hover .msg-actions { opacity:1; pointer-events:auto; }
+.msg-action-btn { width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+    background:none; border:none; color:var(--muted); cursor:pointer; border-radius:6px;
+    font-size:14px; transition:.15s; }
+.msg-action-btn:hover { background:rgba(99,102,241,.15); color:var(--text); }
+.msg-action-btn.delete:hover { background:rgba(239,68,68,.15); color:#ef4444; }
+
 /* ══ INPUT AREA ══ */
 .input-area { padding:12px 20px 16px; background:rgba(13,17,23,.95);
     border-top:1px solid var(--border); flex-shrink:0; backdrop-filter:blur(20px); }
@@ -362,11 +373,25 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 .send-btn svg { width:18px; height:18px; fill:#fff; }
 .input-hint { font-family:var(--mono); font-size:9px; color:var(--muted); margin-top:7px; text-align:center; }
 
-.spinner { display:flex; align-items:center; justify-content:center; gap:8px; padding:20px;
-    color:var(--muted); font-family:var(--mono); font-size:11px; }
-.spinner::before { content:''; width:16px; height:16px; border-radius:50%;
-    border:2px solid var(--border); border-top-color:var(--accent);
-    animation:spin .7s linear infinite; flex-shrink:0; }
+.edit-mode { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.6);
+    display:flex; align-items:center; justify-content:center; z-index:100; }
+.edit-modal { background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:16px; max-width:400px; width:90%; }
+.edit-modal-title { font-size:13px; font-weight:700; color:var(--muted); margin-bottom:10px;
+    font-family:var(--mono); text-transform:uppercase; letter-spacing:1px; }
+.edit-modal textarea { width:100%; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:10px; color:var(--text); font-family:var(--font); font-size:13px;
+    line-height:1.5; resize:none; max-height:150px; margin-bottom:12px; }
+.edit-modal textarea:focus { outline:none; border-color:rgba(99,102,241,.5); }
+.edit-actions { display:flex; gap:8px; justify-content:flex-end; }
+.edit-btn-save { background:rgba(34,212,139,.15); border:1px solid rgba(34,212,139,.3);
+    color:var(--green); padding:8px 16px; border-radius:8px; font-family:var(--mono);
+    font-size:12px; font-weight:600; cursor:pointer; transition:.15s; }
+.edit-btn-save:hover { background:rgba(34,212,139,.25); }
+.edit-btn-cancel { background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3);
+    color:#ef4444; padding:8px 16px; border-radius:8px; font-family:var(--mono);
+    font-size:12px; font-weight:600; cursor:pointer; transition:.15s; }
+.edit-btn-cancel:hover { background:rgba(239,68,68,.25); }
 
 @keyframes pop    { from{opacity:0;transform:scale(.94) translateY(5px)} to{opacity:1;transform:scale(1) translateY(0)} }
 @keyframes pulse  { 0%,100%{opacity:1} 50%{opacity:.5} }
@@ -374,6 +399,18 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
 </style>
 </head>
 <body>
+
+<!-- EDIT MODAL -->
+<div id="editModal" class="edit-mode" style="display:none">
+    <div class="edit-modal">
+        <div class="edit-modal-title">✏️ Редагувати повідомлення</div>
+        <textarea id="editInput" placeholder="Ваше повідомлення"></textarea>
+        <div class="edit-actions">
+            <button class="edit-btn-cancel" onclick="cancelEdit()">✕ Скасувати</button>
+            <button class="edit-btn-save" onclick="saveEdit()">✓ Зберегти</button>
+        </div>
+    </div>
+</div>
 
 <!-- TOPBAR -->
 <div class="topbar">
@@ -386,6 +423,11 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
                 <div class="conv-title-sub">Онлайн <span class="online-dot"></span></div>
             </div>
         </div>
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;" id="convActions" style="display:none">
+        <button onclick="deleteConversation()" title="Видалити чат" style="background:rgba(239,68,68,.12); color:#fca5a5; border:1px solid rgba(239,68,68,.2); padding:7px 13px; border-radius:8px; font-family:var(--mono); font-size:11px; font-weight:600; cursor:pointer; transition:.18s">
+            🗑️ Видалити
+        </button>
     </div>
     <div class="me-badge">
         <div class="me-av">
@@ -412,17 +454,39 @@ body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index
         <div class="nav-item active" data-view="messages" title="Особисті повідомлення" onclick="switchView('messages')">
             💬
         </div>
-        <?php if ($role === 'teacher'): ?>
+        
+        <?php if ($role === 'admin'): ?>
+        <!-- Адміністратор: специфічні кнопки -->
+        <div class="nav-item" data-view="users" title="Додати користувача" onclick="switchView('users')">
+            ➕
+        </div>
+        <div class="nav-item" data-view="course" title="Додати курс" onclick="switchView('course')">
+            📚
+        </div>
+        <div class="nav-item" data-view="reports" title="Звіти" onclick="switchView('reports')">
+            📊
+        </div>
+        <?php elseif ($role === 'teacher'): ?>
+        <!-- Викладач -->
         <div class="nav-item" data-view="students" title="Мої учні" onclick="switchView('students')">
             👥
         </div>
-        <?php endif; ?>
         <div class="nav-item" data-view="schedule" title="Розклад" onclick="switchView('schedule')">
             📅
         </div>
         <div class="nav-item" data-view="tasks" title="Завдання" onclick="switchView('tasks')">
             ✓
         </div>
+        <?php else: ?>
+        <!-- Учень -->
+        <div class="nav-item" data-view="schedule" title="Розклад" onclick="switchView('schedule')">
+            📅
+        </div>
+        <div class="nav-item" data-view="tasks" title="Завдання" onclick="switchView('tasks')">
+            ✓
+        </div>
+        <?php endif; ?>
+        
         <div class="nav-divider"></div>
         <div class="nav-item" data-view="meet" title="Meet" onclick="switchView('meet')">
             📞
@@ -559,11 +623,32 @@ let currentFilter = '';
 // Pending attachments: [{att_id, original_name, mime_type, file_size}]
 let pendingAtts   = [];
 
+// Event delegation for message actions
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('edit-msg-btn')) {
+        editMessage(e.target.dataset.msgId, e.target.dataset.msgBody);
+    }
+    if (e.target.classList.contains('delete') && e.target.dataset.msgId) {
+        deleteMessage(e.target.dataset.msgId);
+    }
+    // Close modal on background click
+    if (e.target.id === 'editModal') {
+        cancelEdit();
+    }
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     setupInput();
     await loadConvList();
     if (currentConvId) openConv(currentConvId);
     else if (AUTO_OPEN_ID) await openOrCreateDirect(AUTO_OPEN_ID);
+    
+    // Close edit modal on Escape
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.getElementById('editModal').style.display === 'flex') {
+            cancelEdit();
+        }
+    });
 });
 
 /* ══ API ══ */
@@ -864,6 +949,9 @@ function setTopBarRaw(name, init, av, isAdmin = false) {
     avEl.style.background = isAdmin ? 'linear-gradient(135deg,#7f1d1d,#dc2626)' : '';
     avEl.innerHTML = av ? `<img src="${esc(av)}" alt="">` : init;
     document.getElementById('convName').textContent = name + (isAdmin ? ' (Адмін)' : '');
+    
+    // Show delete button
+    document.getElementById('convActions').style.display = 'flex';
 }
 
 /* ══ RENDER MESSAGES ══ */
@@ -921,17 +1009,30 @@ function mkBubble(m, meId) {
     const bodyHtml = m.body ? `<div class="bubble">${escHtml(m.body)}${attsHtml}</div>` :
                                `<div class="bubble" style="padding:8px 12px">${attsHtml}</div>`;
 
+    // Only show actions for own messages
+    const bodyAttr = (m.body || '').replace(/"/g, '&quot;').replace(/&/g, '&amp;');
+    const actionsHtml = isMine ? `
+        <div class="msg-actions">
+            <button class="msg-action-btn edit-msg-btn" data-msg-id="${esc(m.id)}" data-msg-body="${bodyAttr}" title="Редагувати">
+                ✏️
+            </button>
+            <button class="msg-action-btn delete" data-msg-id="${esc(m.id)}" title="Видалити">
+                🗑️
+            </button>
+        </div>` : '';
+
     const row = document.createElement('div');
     row.className  = rowClass;
     row.dataset.id = m.id;
     row.innerHTML  = `
         <div class="${avClass}">${avHtml}</div>
-        <div class="bubble-wrap">
+        <div class="bubble-wrap" style="position:relative">
             ${bodyHtml}
             <div class="bubble-meta">
                 <span class="btime">${fmtTime(m.created_at)}</span>
                 ${tick}
             </div>
+            ${actionsHtml}
         </div>`;
     return row;
 }
@@ -1092,6 +1193,7 @@ function switchView(view) {
     // Hide chat area
     document.getElementById('emptyChat').style.display = 'flex';
     document.getElementById('chatView').style.display = 'none';
+    document.getElementById('convActions').style.display = 'none';
     stopPoll();
     currentConvId = '';
     
@@ -1104,11 +1206,95 @@ function switchView(view) {
             'dashboard': '<?= $dashboardUrl ?>',
             'students': '<?= $role === "teacher" ? "students.php" : "dashboard_student.php" ?>',
             'schedule': '<?= $role === "teacher" ? "schedule_teacher.php" : "schedule_student.php" ?>',
-            'tasks': 'tasks.php',
-            'tests': 'tasks.php',
-            'meet': 'meet.php',
+            'tasks': '<?= $role === "teacher" ? "homework.php" : "homework_student.php" ?>',
+            'tests': '<?= $role === "teacher" ? "homework.php" : "homework_student.php" ?>',
+            'users': 'admin_users.php',
+            'course': 'add_course.php',
+            'reports': 'admin_reports.php',
+            'meet': 'https://meet.google.com',
         };
         if (urls[view]) window.location.href = urls[view];
+    }
+}
+
+// ── EDIT MESSAGE ────────────────────────────────────────────────────────────
+let currentEditMsgId = null;
+
+async function editMessage(msgId, bodyAttr) {
+    // Розекранюємо дані з атрибута
+    const div = document.createElement('div');
+    div.innerHTML = bodyAttr;
+    const oldBody = div.textContent;
+    
+    currentEditMsgId = msgId;
+    const editInput = document.getElementById('editInput');
+    editInput.value = oldBody;
+    document.getElementById('editModal').style.display = 'flex';
+    editInput.focus();
+    editInput.select();
+}
+
+async function saveEdit() {
+    const newBody = document.getElementById('editInput').value.trim();
+    if (!newBody) {
+        alert('❌ Повідомлення не може бути пустим');
+        return;
+    }
+    
+    try {
+        const data = await apiPost('edit_message', {
+            message_id: currentEditMsgId,
+            body: newBody
+        });
+        if (data.error) return alert('❌ ' + data.error);
+        alert('✅ Повідомлення редаговано');
+        cancelEdit();
+        openConv(currentConvId);
+    } catch(e) {
+        alert('❌ Помилка: ' + e.message);
+    }
+}
+
+function cancelEdit() {
+    document.getElementById('editModal').style.display = 'none';
+    currentEditMsgId = null;
+}
+
+// ── DELETE MESSAGE ──────────────────────────────────────────────────────────
+async function deleteMessage(msgId) {
+    if (!confirm('🗑️ Видалити це повідомлення?')) return;
+    
+    try {
+        const data = await apiPost('delete_message', {
+            message_id: msgId
+        });
+        if (data.error) return alert('❌ ' + data.error);
+        alert('✅ Повідомлення видалено');
+        const el = document.querySelector(`[data-id="${msgId}"]`);
+        if (el) el.remove();
+    } catch(e) {
+        alert('❌ Помилка: ' + e.message);
+    }
+}
+
+// ── DELETE CONVERSATION ─────────────────────────────────────────────────────
+async function deleteConversation() {
+    if (!confirm('⚠️ Видалити ЦЕЙ ЧАТ? Всі повідомлення буде видалено.')) return;
+    
+    try {
+        const data = await apiPost('delete_conversation', {
+            conv_id: currentConvId
+        });
+        if (data.error) return alert('❌ ' + data.error);
+        alert('✅ Чат видалено');
+        currentConvId = '';
+        stopPoll();
+        document.getElementById('emptyChat').style.display = 'flex';
+        document.getElementById('chatView').style.display = 'none';
+        document.getElementById('convActions').style.display = 'none';
+        await loadConvList();
+    } catch(e) {
+        alert('❌ Помилка: ' + e.message);
     }
 }
 

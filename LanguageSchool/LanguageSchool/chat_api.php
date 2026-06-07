@@ -435,4 +435,109 @@ if ($action === 'mark_read') {
     resp(['ok' => true]);
 }
 
+// ── ACTION: edit_message ───────────────────────────────────────────────────
+if ($action === 'edit_message') {
+    $msgId  = $_POST['message_id'] ?? '';
+    $newBody = trim($_POST['body'] ?? '');
+
+    if (!isUuid($msgId)) fail('Invalid message_id');
+    if ($newBody === '') fail('Body cannot be empty');
+    if (strlen($newBody) > 4000) fail('Too long');
+
+    // Verify ownership
+    $st = $pdo->prepare("
+        SELECT m.sender_id, m.conversation_id FROM chat_messages m WHERE m.id = :id
+    ");
+    $st->execute([':id' => $msgId]);
+    $msg = $st->fetch(PDO::FETCH_ASSOC);
+
+    if (!$msg) fail('Message not found', 404);
+    if ($msg['sender_id'] !== $me) fail('Cannot edit other\'s message', 403);
+
+    // Update the message
+    $upd = $pdo->prepare("UPDATE chat_messages SET body = :b WHERE id = :id");
+    $upd->execute([':b' => $newBody, ':id' => $msgId]);
+
+    resp(['ok' => true]);
+}
+
+// ── ACTION: delete_message ────────────────────────────────────────────────
+if ($action === 'delete_message') {
+    $msgId = $_POST['message_id'] ?? '';
+
+    if (!isUuid($msgId)) fail('Invalid message_id');
+
+    // Verify ownership
+    $st = $pdo->prepare("
+        SELECT m.sender_id FROM chat_messages m WHERE m.id = :id
+    ");
+    $st->execute([':id' => $msgId]);
+    $msg = $st->fetch(PDO::FETCH_ASSOC);
+
+    if (!$msg) fail('Message not found', 404);
+    if ($msg['sender_id'] !== $me) fail('Cannot delete other\'s message', 403);
+
+    // Delete attachments first
+    $attSt = $pdo->prepare("
+        SELECT stored_name FROM chat_attachments WHERE message_id = :id
+    ");
+    $attSt->execute([':id' => $msgId]);
+    $attachments = $attSt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($attachments as $att) {
+        $path = UPLOAD_DIR . $att['stored_name'];
+        if (file_exists($path)) @unlink($path);
+    }
+
+    // Delete attachments from DB
+    $pdo->prepare("DELETE FROM chat_attachments WHERE message_id = :id")
+        ->execute([':id' => $msgId]);
+
+    // Delete the message
+    $pdo->prepare("DELETE FROM chat_messages WHERE id = :id")
+        ->execute([':id' => $msgId]);
+
+    resp(['ok' => true]);
+}
+
+// ── ACTION: delete_conversation ────────────────────────────────────────────
+if ($action === 'delete_conversation') {
+    $convId = $_POST['conv_id'] ?? '';
+
+    if (!isUuid($convId)) fail('Invalid conv_id');
+    if (!convBelongsToMe($pdo, $convId, $me)) fail('Forbidden', 403);
+
+    // Get all attachments for this conversation
+    $attSt = $pdo->prepare("
+        SELECT ca.stored_name FROM chat_attachments ca
+        JOIN chat_messages cm ON cm.id = ca.message_id
+        WHERE cm.conversation_id = :c
+    ");
+    $attSt->execute([':c' => $convId]);
+    $attachments = $attSt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Delete files
+    foreach ($attachments as $att) {
+        $path = UPLOAD_DIR . $att['stored_name'];
+        if (file_exists($path)) @unlink($path);
+    }
+
+    // Delete attachments
+    $pdo->prepare("
+        DELETE FROM chat_attachments WHERE message_id IN (
+            SELECT id FROM chat_messages WHERE conversation_id = :c
+        )
+    ")->execute([':c' => $convId]);
+
+    // Delete messages
+    $pdo->prepare("DELETE FROM chat_messages WHERE conversation_id = :c")
+        ->execute([':c' => $convId]);
+
+    // Delete conversation
+    $pdo->prepare("DELETE FROM chat_conversations WHERE id = :c")
+        ->execute([':c' => $convId]);
+
+    resp(['ok' => true]);
+}
+
 fail('Unknown action');

@@ -40,6 +40,13 @@ $allCourses = $stmtCourses->fetchAll(PDO::FETCH_ASSOC);
 $stmtLangs = $pdo->query("SELECT id, code, name_ua FROM languages ORDER BY name_ua");
 $languages = $stmtLangs->fetchAll(PDO::FETCH_ASSOC);
 
+// emoji map for languages
+$langEmoji = [
+    'en' => '🇬🇧', 'de' => '🇩🇪', 'fr' => '🇫🇷', 'es' => '🇪🇸',
+    'it' => '🇮🇹', 'pl' => '🇵🇱', 'uk' => '🇺🇦', 'zh' => '🇨🇳',
+    'ja' => '🇯🇵', 'ko' => '🇰🇷', 'pt' => '🇵🇹', 'ar' => '🇸🇦',
+];
+
 if ($_POST['action'] ?? false) {
     $action = $_POST['action'];
     $courseId = $_POST['course_id'];
@@ -85,7 +92,6 @@ foreach ($filteredCourses as $course) {
 <link href="theme.css" rel="stylesheet">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
 html, body { height: 100%; }
 body {
     font-family: var(--font);
@@ -98,7 +104,6 @@ body {
     transition: background .25s, color .25s;
 }
 
-/* ── Ambient background ── */
 body::before {
     content: '';
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
@@ -117,18 +122,12 @@ body::before {
     z-index: 30;
     transition: background .25s, border-color .25s;
 }
-
-.sidebar-logo {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border);
-}
+.sidebar-logo { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
 .logo-text { font-size: 19px; font-weight: 800; letter-spacing: -.5px; color: var(--text); }
 .logo-text span { color: var(--teal); }
-
 .sidebar-profile {
     display: flex; align-items: center; gap: 10px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
 }
 .s-avatar {
     width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
@@ -138,24 +137,10 @@ body::before {
     border: 2px solid rgba(99,102,241,.35); overflow: hidden;
 }
 .s-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.profile-name {
-    font-size: 13px; font-weight: 700; color: var(--text);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 148px;
-}
-.profile-role {
-    font-family: var(--mono); font-size: 9px;
-    color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 2px;
-}
-
-.sidebar-nav {
-    flex: 1; padding: 10px;
-    display: flex; flex-direction: column; gap: 1px; overflow-y: auto;
-}
-.nav-label {
-    font-family: var(--mono); font-size: 9px;
-    color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
-    padding: 12px 10px 5px;
-}
+.profile-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 148px; }
+.profile-role { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; margin-top: 2px; }
+.sidebar-nav { flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+.nav-label { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; padding: 12px 10px 5px; }
 .nav-item {
     display: flex; align-items: center; gap: 9px;
     padding: 9px 11px; border-radius: 9px;
@@ -166,12 +151,8 @@ body::before {
 }
 .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .75; }
 .nav-item:hover { color: var(--text); background: var(--hover-nav); }
-.nav-item.active {
-    color: var(--accent); background: rgba(99,102,241,.13);
-    border-color: rgba(99,102,241,.28);
-}
+.nav-item.active { color: var(--accent); background: rgba(99,102,241,.13); border-color: rgba(99,102,241,.28); }
 .nav-item.active svg { opacity: 1; }
-
 .sidebar-footer { padding: 10px; border-top: 1px solid var(--border); }
 .logout-btn {
     display: flex; align-items: center; gap: 9px;
@@ -184,45 +165,32 @@ body::before {
 .logout-btn:hover { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.35); }
 
 /* ══ MAIN ══ */
-.main {
-    margin-left: 240px;
-    flex: 1; display: flex; flex-direction: column;
-    min-height: 100vh; position: relative; z-index: 1;
-}
+.main { margin-left: 240px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
 
 /* ══ TOPBAR ══ */
 .topbar {
     position: sticky; top: 0; z-index: 20;
-    height: 60px;
+    height: 56px;
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 28px; gap: 16px;
+    padding: 0 24px; gap: 16px;
     background: var(--topbar-bg); backdrop-filter: blur(18px);
     border-bottom: 1px solid var(--border);
     transition: background .25s, border-color .25s;
 }
-.page-title {
-    font-size: 15px; font-weight: 800; letter-spacing: -.2px;
-    display: flex; align-items: center; gap: 8px; color: var(--text);
-}
-
-.topbar-controls { display: flex; align-items: center; gap: 10px; }
-
+.page-title { font-size: 14px; font-weight: 800; letter-spacing: -.2px; display: flex; align-items: center; gap: 8px; color: var(--text); }
+.topbar-controls { display: flex; align-items: center; gap: 8px; }
 .search-box {
     display: flex; align-items: center; gap: 8px;
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 9px; padding: 0 12px; height: 36px;
+    border-radius: 9px; padding: 0 12px; height: 34px;
     transition: border-color .15s, background .25s;
 }
 .search-box:focus-within { border-color: rgba(99,102,241,.5); }
 .search-box svg { flex-shrink: 0; color: var(--muted); }
-.search-box input {
-    background: none; border: none; outline: none;
-    color: var(--text); font-family: var(--font); font-size: 13px; width: 190px;
-}
+.search-box input { background: none; border: none; outline: none; color: var(--text); font-family: var(--font); font-size: 13px; width: 180px; }
 .search-box input::placeholder { color: var(--muted); }
-
 .filter-select {
-    height: 36px; padding: 0 12px;
+    height: 34px; padding: 0 12px;
     background: var(--card); border: 1px solid var(--border);
     border-radius: 9px; color: var(--text);
     font-family: var(--font); font-size: 13px; cursor: pointer;
@@ -231,123 +199,110 @@ body::before {
 .filter-select:focus, .filter-select:hover { border-color: rgba(99,102,241,.4); }
 
 /* ══ CONTENT ══ */
-.content { padding: 24px 28px; flex: 1; }
+.content { padding: 20px 24px; flex: 1; }
 
-.lang-section { margin-bottom: 36px; }
+/* ══ LANG SECTION ══ */
+.lang-section { margin-bottom: 28px; }
 .lang-heading {
-    display: flex; align-items: center; gap: 10px;
-    font-size: 13px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.5px; color: var(--muted);
-    font-family: var(--mono); margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--muted);
+    font-family: var(--mono); margin-bottom: 8px;
 }
-.lang-heading::after {
-    content: ''; flex: 1; height: 1px; background: var(--border);
-}
-.lang-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--teal); flex-shrink: 0;
-    box-shadow: 0 0 8px var(--teal);
-}
+.lang-heading::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.lang-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); flex-shrink: 0; box-shadow: 0 0 8px var(--teal); }
+.courses-list { display: flex; flex-direction: column; gap: 6px; }
 
-.courses-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 14px;
-}
-
-/* ── Course card ── */
+/* ══ COMPACT COURSE ROW ══ */
 .course-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 18px;
-    display: flex; flex-direction: column; gap: 14px;
-    transition: border-color .2s, transform .2s, box-shadow .2s, background .25s;
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 14px;
+    transition: border-color .2s, transform .15s, box-shadow .2s, background .25s;
     position: relative; overflow: hidden;
 }
-.course-card:hover {
-    border-color: rgba(99,102,241,.45);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(99,102,241,.12);
+.course-card::before {
+    content: '';
+    position: absolute; left: 0; top: 10px; bottom: 10px;
+    width: 3px; border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, var(--accent), var(--teal));
+    opacity: 0; transition: opacity .2s;
+}
+.course-card:hover { border-color: rgba(99,102,241,.4); transform: translateX(2px); box-shadow: 0 4px 16px rgba(99,102,241,.09); }
+.course-card:hover::before { opacity: 1; }
+
+/* Left icon block */
+.card-icon {
+    width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    background: linear-gradient(135deg, rgba(99,102,241,.12), rgba(20,184,166,.09));
+    border: 1px solid rgba(99,102,241,.16);
 }
 
-.card-top {
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-}
-.lang-badge {
+/* Course info */
+.card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.course-title { font-size: 13px; font-weight: 800; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.course-desc { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card-badges { display: flex; align-items: center; gap: 5px; margin-top: 2px; flex-wrap: wrap; }
+.badge {
     font-family: var(--mono); font-size: 10px; font-weight: 500;
-    color: var(--accent); background: rgba(99,102,241,.10);
-    padding: 3px 9px; border-radius: 6px; letter-spacing: .3px;
-    border: 1px solid rgba(99,102,241,.22); white-space: nowrap;
+    padding: 2px 7px; border-radius: 5px; border: 1px solid transparent; line-height: 1.5;
 }
-.enrolled-chip {
-    font-family: var(--mono); font-size: 10px; font-weight: 500;
-    color: var(--green); background: rgba(34,197,94,.10);
-    padding: 3px 9px; border-radius: 6px; letter-spacing: .3px;
-    border: 1px solid rgba(34,197,94,.22); white-space: nowrap;
-}
+.badge-lang   { color: var(--accent); background: rgba(99,102,241,.09); border-color: rgba(99,102,241,.2); }
+.badge-level  { color: var(--amber); background: rgba(245,158,11,.09); border-color: rgba(245,158,11,.2); }
+.badge-price  { color: var(--green); background: rgba(34,197,94,.09); border-color: rgba(34,197,94,.2); }
+.badge-enrolled { color: var(--green); background: rgba(34,197,94,.09); border-color: rgba(34,197,94,.2); font-weight: 700; }
 
-.card-body { flex: 1; display: flex; flex-direction: column; gap: 8px; }
-.course-title {
-    font-size: 15px; font-weight: 800; line-height: 1.3; color: var(--text);
-}
-.course-desc {
-    font-size: 12px; color: var(--muted); line-height: 1.55;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-
-.card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.tag {
-    font-family: var(--mono); font-size: 10px; font-weight: 500;
-    padding: 3px 9px; border-radius: 6px; border: 1px solid transparent;
-}
-.tag-level  { color: var(--amber); background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.22); }
-.tag-price  { color: var(--green); background: rgba(34,197,94,.10); border-color: rgba(34,197,94,.22); }
-
-.teacher-row {
-    display: flex; align-items: center; gap: 10px;
-    padding-top: 12px; border-top: 1px solid var(--border);
+/* Teacher block */
+.card-teacher {
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0; width: 150px;
 }
 .t-avatar {
-    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
     background: linear-gradient(135deg, var(--accent), var(--teal));
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; font-weight: 800; color: #fff; overflow: hidden;
 }
 .t-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.t-name { font-size: 12px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.t-role { font-family: var(--mono); font-size: 9px; color: var(--muted); margin-top: 1px; text-transform: uppercase; letter-spacing: .8px; }
-.students-pill {
+.t-info { min-width: 0; }
+.t-name { font-size: 11px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 88px; }
+.t-sub { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+
+/* Students count */
+.students-count {
+    flex-shrink: 0;
     font-family: var(--mono); font-size: 10px; color: var(--muted);
     background: var(--input-bg); border: 1px solid var(--border);
-    padding: 3px 9px; border-radius: 6px; white-space: nowrap; flex-shrink: 0;
+    padding: 3px 9px; border-radius: 6px; white-space: nowrap;
 }
 
-.card-action { display: flex; }
+/* Action button */
+.card-action { flex-shrink: 0; }
 .btn {
-    flex: 1; height: 36px; border-radius: 9px;
-    font-family: var(--font); font-size: 12px; font-weight: 700;
-    cursor: pointer; transition: .15s; border: none;
-    display: flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 14px; border-radius: 8px;
+    font-family: var(--font); font-size: 11px; font-weight: 700;
+    cursor: pointer; transition: .15s; border: none; white-space: nowrap;
+    display: flex; align-items: center; justify-content: center; gap: 5px;
 }
-.btn-enroll   { background: rgba(34,197,94,.14);  color: var(--green); border: 1px solid rgba(34,197,94,.3); }
-.btn-enroll:hover { background: rgba(34,197,94,.24); border-color: rgba(34,197,94,.5); }
-.btn-unenroll { background: rgba(239,68,68,.10); color: var(--red); border: 1px solid rgba(239,68,68,.22); }
-.btn-unenroll:hover { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.4); }
+.btn-enroll   { background: rgba(34,197,94,.13); color: var(--green); border: 1px solid rgba(34,197,94,.28); }
+.btn-enroll:hover { background: rgba(34,197,94,.22); border-color: rgba(34,197,94,.5); }
+.btn-unenroll { background: rgba(239,68,68,.09); color: var(--red); border: 1px solid rgba(239,68,68,.2); }
+.btn-unenroll:hover { background: rgba(239,68,68,.17); border-color: rgba(239,68,68,.4); }
 
-/* ── Empty ── */
-.empty-state {
-    text-align: center; padding: 64px 40px;
-    background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
-}
-.empty-icon  { font-size: 40px; margin-bottom: 12px; opacity: .5; }
-.empty-title { font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+/* ── Empty state ── */
+.empty-state { text-align: center; padding: 56px 40px; background: var(--card); border: 1px dashed var(--border); border-radius: 12px; }
+.empty-icon  { font-size: 36px; margin-bottom: 10px; opacity: .5; }
+.empty-title { font-size: 14px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
 .empty-sub   { font-family: var(--mono); font-size: 11px; color: var(--muted); }
 
 /* ── Toast ── */
 .toast {
     position: fixed; bottom: 24px; right: 24px; z-index: 999;
-    padding: 12px 18px; border-radius: 10px;
+    padding: 11px 16px; border-radius: 10px;
     font-size: 13px; font-weight: 700;
     display: none; animation: slideIn .22s ease;
 }
@@ -355,19 +310,18 @@ body::before {
 .toast.success { background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.3); color: var(--green); }
 @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* ── Light theme overrides для цього файлу ── */
+/* Light overrides */
 body.light-theme .sidebar { box-shadow: 2px 0 16px rgba(0,0,0,.06); }
-body.light-theme .course-card:hover { box-shadow: 0 8px 24px rgba(99,102,241,.10); }
+body.light-theme .card-icon { background: linear-gradient(135deg,rgba(79,70,229,.09),rgba(8,145,178,.07)); border-color: rgba(79,70,229,.18); }
+body.light-theme .badge-lang { color: #4338ca; background: rgba(79,70,229,.09); border-color: rgba(79,70,229,.18); }
+body.light-theme .badge-level { color: #b45309; background: rgba(217,119,6,.09); border-color: rgba(217,119,6,.2); }
+body.light-theme .badge-price { color: #15803d; background: rgba(22,163,74,.09); border-color: rgba(22,163,74,.2); }
+body.light-theme .badge-enrolled { color: #15803d; background: rgba(22,163,74,.09); border-color: rgba(22,163,74,.2); }
+body.light-theme .btn-enroll  { background: rgba(22,163,74,.11); color: #15803d; border-color: rgba(22,163,74,.26); }
+body.light-theme .btn-enroll:hover { background: rgba(22,163,74,.20); }
+body.light-theme .btn-unenroll { background: rgba(220,38,38,.07); color: #dc2626; border-color: rgba(220,38,38,.18); }
+body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.15); }
 body.light-theme .filter-select option { background: #ffffff; color: #1e293b; }
-body.light-theme .lang-badge { color: #4338ca; background: rgba(79,70,229,.10); border-color: rgba(79,70,229,.2); }
-body.light-theme .lang-dot { background: #0891b2; box-shadow: 0 0 8px rgba(8,145,178,.4); }
-body.light-theme .tag-level { color: #b45309; background: rgba(217,119,6,.10); border-color: rgba(217,119,6,.22); }
-body.light-theme .tag-price { color: #15803d; background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.22); }
-body.light-theme .enrolled-chip { color: #15803d; background: rgba(22,163,74,.10); border-color: rgba(22,163,74,.2); }
-body.light-theme .btn-enroll  { background: rgba(22,163,74,.12); color: #15803d; border-color: rgba(22,163,74,.28); }
-body.light-theme .btn-enroll:hover { background: rgba(22,163,74,.22); }
-body.light-theme .btn-unenroll { background: rgba(220,38,38,.08); color: #dc2626; border-color: rgba(220,38,38,.2); }
-body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.16); }
 </style>
 </head>
 <body>
@@ -461,14 +415,19 @@ body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.16); }
             <div class="empty-sub">Спробуйте змінити параметри пошуку</div>
         </div>
         <?php else: ?>
-            <?php foreach ($coursesByLang as $lang => $courses): ?>
+            <?php foreach ($coursesByLang as $lang => $courses):
+                // find lang_code for emoji
+                $langCode = '';
+                foreach ($courses as $c) { $langCode = $c['lang_code'] ?? ''; break; }
+                $emoji = $langEmoji[$langCode] ?? '🌐';
+            ?>
             <div class="lang-section">
                 <div class="lang-heading">
                     <span class="lang-dot"></span>
                     <?= htmlspecialchars($lang) ?>
-                    <span style="color:var(--muted); font-size:10px;"><?= count($courses) ?> курс<?= count($courses) !== 1 ? 'ів' : '' ?></span>
+                    <span style="opacity:.6;"><?= count($courses) ?> курс<?= count($courses) !== 1 ? 'ів' : '' ?></span>
                 </div>
-                <div class="courses-grid">
+                <div class="courses-list">
                     <?php foreach ($courses as $course):
                         $isEnrolled = in_array($course['id'], $enrolledCourseIds);
                         $teacherInitials = strtoupper(
@@ -478,23 +437,24 @@ body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.16); }
                         $teacherName = trim(($course['teacher_first'] ?? '') . ' ' . ($course['teacher_last'] ?? ''));
                     ?>
                     <div class="course-card">
-                        <div class="card-top">
-                            <span class="lang-badge"><?= htmlspecialchars($course['language']) ?></span>
-                            <?php if ($isEnrolled): ?>
-                                <span class="enrolled-chip">✓ Записаний</span>
-                            <?php endif; ?>
-                        </div>
-                        <div class="card-body">
+                        <div class="card-icon"><?= $emoji ?></div>
+
+                        <div class="card-info">
                             <div class="course-title"><?= htmlspecialchars($course['title']) ?></div>
                             <?php if (!empty($course['description'])): ?>
                             <div class="course-desc"><?= htmlspecialchars($course['description']) ?></div>
                             <?php endif; ?>
-                            <div class="card-tags">
-                                <span class="tag tag-level"><?= htmlspecialchars($course['level']) ?></span>
-                                <span class="tag tag-price"><?= htmlspecialchars($course['price']) ?> грн</span>
+                            <div class="card-badges">
+                                <span class="badge badge-lang"><?= htmlspecialchars($course['language']) ?></span>
+                                <span class="badge badge-level"><?= htmlspecialchars($course['level']) ?></span>
+                                <span class="badge badge-price"><?= htmlspecialchars($course['price']) ?> грн</span>
+                                <?php if ($isEnrolled): ?>
+                                    <span class="badge badge-enrolled">✓ Записаний</span>
+                                <?php endif; ?>
                             </div>
                         </div>
-                        <div class="teacher-row">
+
+                        <div class="card-teacher">
                             <div class="t-avatar">
                                 <?php if (!empty($course['teacher_avatar']) && file_exists($course['teacher_avatar'])): ?>
                                     <img src="<?= htmlspecialchars($course['teacher_avatar']) ?>" alt="">
@@ -502,19 +462,21 @@ body.light-theme .btn-unenroll:hover { background: rgba(220,38,38,.16); }
                             </div>
                             <div class="t-info">
                                 <div class="t-name"><?= htmlspecialchars($teacherName) ?></div>
-                                <div class="t-role">Викладач</div>
+                                <div class="t-sub">Викладач</div>
                             </div>
-                            <div class="students-pill">👥 <?= $course['students_count'] ?></div>
                         </div>
+
+                        <div class="students-count">👥 <?= $course['students_count'] ?></div>
+
                         <div class="card-action">
                             <?php if ($isEnrolled): ?>
-                            <form method="POST" style="flex:1;">
+                            <form method="POST">
                                 <input type="hidden" name="action" value="unenroll">
                                 <input type="hidden" name="course_id" value="<?= $course['id'] ?>">
-                                <button type="submit" class="btn btn-unenroll">Вийти з курсу</button>
+                                <button type="submit" class="btn btn-unenroll">Вийти</button>
                             </form>
                             <?php else: ?>
-                            <form method="POST" style="flex:1;">
+                            <form method="POST">
                                 <input type="hidden" name="action" value="enroll">
                                 <input type="hidden" name="course_id" value="<?= $course['id'] ?>">
                                 <button type="submit" class="btn btn-enroll">Записатися</button>

@@ -3,7 +3,18 @@ session_start();
 require 'config.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'teacher') {
-    die("Доступ заборонено");
+    header("Location: access_denied.php");
+    exit;
+}
+
+// Перевіряємо актуальний статус з БД
+$check = $pdo->prepare("SELECT status FROM users WHERE id = :id");
+$check->execute(['id' => $_SESSION['user_id']]);
+$currentStatus = $check->fetchColumn();
+
+if ($currentStatus === 'banned' || $currentStatus === 'inactive') {
+    session_destroy();
+    header("Location: login.php?error=inactive"); exit;
 }
 
 $teacherId = $_SESSION['user_id'];

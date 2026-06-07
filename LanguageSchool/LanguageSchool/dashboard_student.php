@@ -3,7 +3,7 @@ session_start();
 require 'config.php';
 
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'student') {
-    header("Location: login.php");
+    header("Location: access_denied.php");
     exit;
 }
 

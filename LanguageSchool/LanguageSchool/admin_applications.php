@@ -42,7 +42,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['app
             $studentId = $enr->fetchColumn();
             $pdo->prepare("DELETE FROM enrollments WHERE id = :id")->execute(['id' => $realId]);
             if ($studentId) {
-                // Видаляємо юзера лише якщо він ще неактивний і без інших enrollments
                 $otherEnr = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = :sid");
                 $otherEnr->execute(['sid' => $studentId]);
                 if ($otherEnr->fetchColumn() == 0) {
@@ -54,13 +53,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['app
         }
 
     } else {
-        // Стара логіка — таблиця applications
+        // Таблиця applications (форма заявки без реєстрації)
         $realId = preg_replace('/^app_/', '', $appId);
 
         if ($action === 'approve') {
             $pdo->prepare("UPDATE applications SET status = 'approved' WHERE id = :id")
                 ->execute(['id' => $realId]);
-            $_SESSION['flash'] = ['type' => 'success', 'text' => 'Заявку підтверджено.'];
+
+            // Отримуємо дані заявки
+            $app = $pdo->prepare("SELECT * FROM applications WHERE id = :id");
+            $app->execute(['id' => $realId]);
+            $appData = $app->fetch(PDO::FETCH_ASSOC);
+
+            if ($appData && !empty($appData['email'])) {
+                // Перевіряємо чи юзер вже існує
+                $exists = $pdo->prepare("SELECT id FROM users WHERE email = :email");
+                $exists->execute(['email' => $appData['email']]);
+                $existingUserId = $exists->fetchColumn();
+
+                if (!$existingUserId) {
+                    // Розбиваємо ім'я на ім'я + прізвище
+                    $nameParts = explode(' ', trim($appData['name']), 2);
+                    $firstName = $nameParts[0] ?? $appData['name'];
+                    $lastName  = $nameParts[1] ?? '';
+
+                    $tempPassword = bin2hex(random_bytes(6));
+                    $passwordHash = password_hash($tempPassword, PASSWORD_BCRYPT);
+
+                    $insertUser = $pdo->prepare("
+                        INSERT INTO users (email, password_hash, first_name, last_name, phone, role, status)
+                        VALUES (:email, :ph, :first, :last, :phone, 'student', 'active')
+                        RETURNING id
+                    ");
+                    $insertUser->execute([
+                        'email' => $appData['email'],
+                        'ph'    => $passwordHash,
+                        'first' => $firstName,
+                        'last'  => $lastName,
+                        'phone' => $appData['phone'] ?? '',
+                    ]);
+
+                    $newUserId = $insertUser->fetchColumn();
+
+                    // Записуємо студента на курс
+                    if (!empty($appData['course_id'])) {
+                        $pdo->prepare("
+                            INSERT INTO enrollments (student_id, course_id, status)
+                            VALUES (:sid, :cid, 'active')
+                        ")->execute([
+                            'sid' => $newUserId,
+                            'cid' => $appData['course_id'],
+                        ]);
+                    }
+
+                    // Зберігаємо тимчасові дані для показу листа
+                    $_SESSION['temp_creds'] = [
+                        'email'     => $appData['email'],
+                        'firstName' => $firstName,
+                        'lastName'  => $lastName,
+                        'password'  => $tempPassword,
+                    ];
+
+                    $_SESSION['flash'] = ['type' => 'success', 'text' => 'Заявку підтверджено. Студента створено в системі!'];
+                } else {
+                    // Юзер вже існує — просто записуємо на курс якщо треба
+                    if (!empty($appData['course_id'])) {
+                        $alreadyEnrolled = $pdo->prepare("
+                            SELECT COUNT(*) FROM enrollments
+                            WHERE student_id = :sid AND course_id = :cid
+                        ");
+                        $alreadyEnrolled->execute([
+                            'sid' => $existingUserId,
+                            'cid' => $appData['course_id'],
+                        ]);
+                        if ($alreadyEnrolled->fetchColumn() == 0) {
+                            $pdo->prepare("
+                                INSERT INTO enrollments (student_id, course_id, status)
+                                VALUES (:sid, :cid, 'active')
+                            ")->execute([
+                                'sid' => $existingUserId,
+                                'cid' => $appData['course_id'],
+                            ]);
+                        }
+                    }
+                    $_SESSION['flash'] = ['type' => 'success', 'text' => 'Заявку підтверджено. Користувач вже існує в системі.'];
+                }
+            } else {
+                $_SESSION['flash'] = ['type' => 'warn', 'text' => 'Заявку підтверджено, але email відсутній — користувача не створено.'];
+            }
 
         } elseif ($action === 'reject') {
             $pdo->prepare("UPDATE applications SET status = 'rejected' WHERE id = :id")
@@ -84,7 +164,7 @@ $apps = $pdo->query("
         SELECT
             'app_' || a.id::text   AS id,
             a.name                 AS display_name,
-            NULL                   AS email,
+            a.email,
             a.phone,
             a.status,
             a.created_at,
@@ -309,9 +389,114 @@ header {
 }
 .empty-icon { font-size: 36px; margin-bottom: 12px; opacity: .45; }
 .empty-title { font-size: 14px; font-weight: 700; color: var(--muted); }
+
+/* ── CREDENTIALS MODAL ── */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.65); backdrop-filter: blur(8px);
+    z-index: 200; align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 18px; padding: 32px;
+    max-width: 520px; width: 90%;
+}
+.modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+}
+.modal-title-text { font-size: 17px; font-weight: 800; }
+.modal-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 20px; cursor: pointer; line-height: 1;
+}
+.modal-label {
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
+    margin-bottom: 6px;
+}
+.modal-value {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+    font-family: var(--mono); font-size: 13px; color: var(--teal);
+    margin-bottom: 16px;
+}
+.modal-textarea {
+    width: 100%; height: 220px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px;
+    font-family: var(--mono); font-size: 12px; color: var(--text);
+    resize: none; line-height: 1.6; outline: none;
+}
+.modal-actions-row { display: flex; gap: 10px; margin-top: 16px; }
+.modal-btn {
+    flex: 1; padding: 10px; border-radius: 10px;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    cursor: pointer; text-align: center; text-decoration: none;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: .15s;
+}
+.modal-btn-copy {
+    background: rgba(99,102,241,.15); color: #a5b4fc;
+    border: 1px solid rgba(99,102,241,.3);
+}
+.modal-btn-copy:hover { background: rgba(99,102,241,.28); }
+.modal-btn-gmail {
+    background: rgba(34,211,238,.1); color: var(--teal);
+    border: 1px solid rgba(34,211,238,.3);
+}
+.modal-btn-gmail:hover { background: rgba(34,211,238,.2); }
+.modal-hint {
+    margin-top: 10px; font-family: var(--mono); font-size: 10px;
+    color: var(--muted); text-align: center;
+}
 </style>
 </head>
 <body>
+
+<?php if (isset($_SESSION['temp_creds'])): ?>
+<?php
+    $c = $_SESSION['temp_creds'];
+    unset($_SESSION['temp_creds']);
+    $gmailSubject = rawurlencode("LinguaSchool — Ваші дані для входу");
+    $gmailBody = rawurlencode(
+        "Привіт, {$c['firstName']}!\n\n" .
+        "Вас додано до платформи LinguaSchool.\n" .
+        "Ваші дані для входу:\n\n" .
+        "Логін (Email): {$c['email']}\n" .
+        "Тимчасовий пароль: {$c['password']}\n\n" .
+        "Посилання: http://localhost:3000/LanguageSchool/LanguageSchool/login.php\n\n" .
+        "Після першого входу змініть пароль.\n\n" .
+        "З повагою,\nАдміністрація LinguaSchool"
+    );
+    $letterText = "Привіт, {$c['firstName']}!\n\nВас додано до платформи LinguaSchool.\nВаші дані для входу:\n\n📧 Логін (Email): {$c['email']}\n🔐 Тимчасовий пароль: {$c['password']}\n\nПосилання для входу:\nhttp://localhost:3000/LanguageSchool/LanguageSchool/login.php\n\n⚠️ Після першого входу змініть пароль в особистому кабінеті.\n\nЗ повагою,\nАдміністрація LinguaSchool";
+?>
+<div class="modal-overlay open" id="credsModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <div class="modal-title-text">📋 Лист для студента</div>
+            <button class="modal-close" onclick="document.getElementById('credsModal').classList.remove('open')">✕</button>
+        </div>
+
+        <div class="modal-label">Кому:</div>
+        <div class="modal-value"><?= htmlspecialchars($c['email']) ?></div>
+
+        <div class="modal-label">Тема:</div>
+        <div class="modal-value" style="color: var(--text);">LinguaSchool — Ваші дані для входу</div>
+
+        <div class="modal-label">Текст листа:</div>
+        <textarea class="modal-textarea" id="credsText" readonly><?= htmlspecialchars($letterText) ?></textarea>
+
+        <div class="modal-actions-row">
+            <button class="modal-btn modal-btn-copy" onclick="copyCredsTxt(this)">📋 Копіювати текст</button>
+            <a class="modal-btn modal-btn-gmail"
+               href="https://mail.google.com/mail/?view=cm&to=<?= rawurlencode($c['email']) ?>&su=<?= $gmailSubject ?>&body=<?= $gmailBody ?>"
+               target="_blank">✉️ Відкрити у Gmail</a>
+        </div>
+        <div class="modal-hint">Скопіюйте текст або відкрийте у Gmail щоб надіслати дані доступу</div>
+    </div>
+</div>
+<?php endif; ?>
 
 <header>
     <div>
@@ -326,7 +511,7 @@ header {
 
 <div class="wrap">
 
-    <?php 
+    <?php
     $flash = $_SESSION['flash'] ?? null;
     if ($flash) unset($_SESSION['flash']);
     if ($flash): ?>
@@ -375,7 +560,6 @@ header {
     <?php foreach ($newApps as $a): ?>
         <div class="app-card is-new">
 
-            <!-- Тип заявки -->
             <?php if ($a['source'] === 'enrollment'): ?>
                 <span class="source-badge source-enrollment">📋 Реєстрація на сайті</span>
             <?php else: ?>
@@ -486,6 +670,18 @@ header {
 
 </div>
 
+<script>
+function copyCredsTxt(btn) {
+    const ta = document.getElementById('credsText');
+    ta.select();
+    document.execCommand('copy');
+    btn.textContent = '✅ Скопійовано!';
+    setTimeout(() => btn.textContent = '📋 Копіювати текст', 2000);
+}
+document.getElementById('credsModal')?.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+});
+</script>
 <script src="theme-switcher.js"></script>
 </body>
 </html>
