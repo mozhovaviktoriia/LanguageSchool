@@ -720,7 +720,7 @@ body::before {
 
     <span class="nav-label">Меню</span>
     <a class="nav-item" href="dashboard_student.php"><span class="nav-icon">📚</span> Мій профіль</a>
-    <a class="nav-item" href="my_lessons.php"><span class="nav-icon">📖</span> Уроки</a>
+    <a class="nav-item" href="homework_student.php"><span class="nav-icon">📖</span> Завдання</a>
     <a class="nav-item" href="schedule_student.php"><span class="nav-icon">📅</span> Розклад</a>
     <a class="nav-item" href="chat.php"><span class="nav-icon">💬</span> Чат</a>
     <a class="nav-item" href="https://meet.google.com" target="_blank"><span class="nav-icon">📞</span> Meet</a>
