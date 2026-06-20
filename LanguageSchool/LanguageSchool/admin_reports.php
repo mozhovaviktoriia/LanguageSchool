@@ -20,7 +20,7 @@ $students = $pdo->query("
     ORDER BY u.last_name, u.first_name
 ")->fetchAll(PDO::FETCH_ASSOC);
 
-// Курси завершені студентом (для диплому)
+// Курси завершені студентом (для сертифіката)
 // Завершений = enrolled + всі завдання здані
 $completedEnrollments = $pdo->query("
     SELECT
@@ -106,11 +106,11 @@ tbody td { padding:12px 16px; vertical-align:middle; }
 .btn-pdf   { background:rgba(99,102,241,.12); color:#a5b4fc; border:1px solid rgba(99,102,241,.25); }
 .btn-pdf:hover { background:rgba(99,102,241,.25); }
 
-/* Diploma table */
+/* Certificate table */
 .course-chip { display:inline-block; background:rgba(34,211,238,.08); border:1px solid rgba(34,211,238,.15);
     border-radius:5px; padding:2px 8px; font-family:var(--mono); font-size:10px; color:var(--teal); }
-.btn-diploma { background:rgba(245,158,11,.10); color:var(--amber); border:1px solid rgba(245,158,11,.2); }
-.btn-diploma:hover { background:rgba(245,158,11,.22); }
+.btn-certificate { background:rgba(245,158,11,.10); color:var(--amber); border:1px solid rgba(245,158,11,.2); }
+.btn-certificate:hover { background:rgba(245,158,11,.22); }
 
 .divider { height:1px; background:linear-gradient(90deg,transparent,var(--border),transparent); margin:40px 0; }
 </style>
@@ -119,7 +119,7 @@ tbody td { padding:12px 16px; vertical-align:middle; }
 <header>
     <div>
         <div class="logo">Lingua<span>School</span></div>
-        <div class="header-sub">Звіти та дипломи</div>
+        <div class="header-sub">Звіти та сертифікати</div>
     </div>
     <div style="display:flex;gap:10px;">
         <button class="theme-toggle nav-link" title="Тема"><span class="theme-toggle-icon">☀️</span></button>
@@ -199,9 +199,9 @@ tbody td { padding:12px 16px; vertical-align:middle; }
 
     <div class="divider"></div>
 
-    <!-- Дипломи -->
+    <!-- Сертифікати -->
     <div class="sec-head">
-        <div class="sec-title">Дипломи про закінчення курсу</div>
+        <div class="sec-title">Сертифікати про закінчення курсу</div>
         <span class="pill"><?= count($completedEnrollments) ?> записів</span>
     </div>
 
@@ -235,10 +235,10 @@ tbody td { padding:12px 16px; vertical-align:middle; }
                 </td>
                 <td>
                     <div class="actions">
-                        <a class="btn-report btn-diploma"
-                           href="generate_diploma.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>"
+                        <a class="btn-report btn-certificate"
+                           href="generate_certificate.php?student_id=<?= $e['student_id'] ?>&course_id=<?= $e['course_id'] ?>"
                            target="_blank">
-                            🎓 Диплом PDF
+                            🎓 Сертифікат PDF
                         </a>
                     </div>
                 </td>

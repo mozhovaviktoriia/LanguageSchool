@@ -35,7 +35,7 @@ if (!$course) die('Курс не знайдено');
 $fullName    = $student['first_name'] . ' ' . $student['last_name'];
 $teacherName = trim(($course['teacher_first'] ?? '') . ' ' . ($course['teacher_last'] ?? '')) ?: 'Адміністрація';
 $today       = date('d.m.Y');
-$diplomaNum  = strtoupper(substr(md5($studentId . $courseId), 0, 8));
+$certificateNum  = strtoupper(substr(md5($studentId . $courseId), 0, 8));
 
 // -------------------------------------------------------
 // TCPDF — A4 альбомна (297 x 210 мм), без полів
@@ -50,7 +50,7 @@ $pdf->AddPage();
 // -------------------------------------------------------
 // 1. ФОН — розтягуємо на весь аркуш 297×210 мм
 // -------------------------------------------------------
-$bgPath = __DIR__ . '/images/diploma_bg.jpg';
+$bgPath = __DIR__ . '/images/certificate_bg.jpg';
 if (!file_exists($bgPath)) die('Фон не знайдено: ' . $bgPath);
 $pdf->Image($bgPath, 0, 0, 297, 210, 'JPG', '', '', false, 300, '', false, false, 0);
 
@@ -132,15 +132,15 @@ $pdf->SetXY(147, 157);  // было 171
 $pdf->Cell(90, 5, 'ADMINISTRATION', 0, 0, 'C');
 
 // -------------------------------------------------------
-// 9. Номер диплому внизу праворуч
+// 9. Номер сертифіката внизу праворуч
 // -------------------------------------------------------
 $pdf->SetFont('dejavusans', '', 8);
 $pdf->SetTextColor(160, 160, 160);
 $pdf->SetXY(220, 200);
-$pdf->Cell(70, 5, 'No. ' . $diplomaNum, 0, 0, 'R');
+$pdf->Cell(70, 5, 'No. ' . $certificateNum, 0, 0, 'R');
 
 // -------------------------------------------------------
 // 10. Видати PDF на скачування
 // -------------------------------------------------------
-$filename = 'диплом_' . $student['last_name'] . '.pdf';
+$filename = 'сертифікат_' . $student['last_name'] . '.pdf';
 $pdf->Output($filename, 'D');
