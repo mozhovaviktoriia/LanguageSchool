@@ -73,6 +73,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $deadline    = $_POST['deadline'] ?: null;
         $assignedTo  = $_POST['assigned_to'] ?: null;
 
+        // Валідація дедлайну
+        if ($deadline) {
+            $deadlineTime = strtotime($deadline);
+            $currentTime = time();
+            if ($deadlineTime < $currentTime) {
+                $errorMsg = 'Дедлайн не може бути в минулому.';
+            }
+        }
+
         if (!$title || !$courseId) {
             $errorMsg = 'Заповніть назву та оберіть курс.';
         } else {
@@ -358,7 +367,8 @@ body::before { content:''; position:fixed; inset:0; background:radial-gradient(e
                         <div class="form-group full">
                             <label class="form-label">Дедлайн (необов'язково)</label>
                             <input class="form-input" name="deadline" type="datetime-local"
-                                   value="<?= htmlspecialchars($existingTask['deadline'] ?? '') ?>">
+                                   value="<?= htmlspecialchars($existingTask['deadline'] ?? '') ?>"
+                                   min="<?= date('Y-m-d\TH:i') ?>">
                         </div>
                     </div>
                 </div>
