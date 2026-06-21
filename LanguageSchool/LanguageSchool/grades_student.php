@@ -298,8 +298,9 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .dist-F .dist-label { color:var(--red);   } .dist-F .dist-bar-fill { background:linear-gradient(90deg,rgba(239,68,68,.7),rgba(239,68,68,.35)); }
 
 /* ── Activity chart ── */
-.activity-chart { display:flex; align-items:flex-end; gap:8px; height:80px; padding-top:8px; }
-.act-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; height:100%; }
+.activity-chart { display:flex; align-items:stretch; gap:8px; height:100px; padding-top:8px; }
+.act-bar-wrap { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; height:100%; }
+.act-bar-track { flex:1; width:100%; display:flex; align-items:flex-end; }
 .act-bar { width:100%; border-radius:4px 4px 0 0; background:linear-gradient(180deg,rgba(99,102,241,.6),rgba(99,102,241,.25)); transition:height .5s ease; min-height:3px; }
 .act-label { font-family:var(--mono); font-size:8px; color:var(--muted); }
 .act-count { font-family:var(--mono); font-size:8px; color:#a5b4fc; font-weight:700; }
@@ -539,10 +540,10 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
                                 $barH = max($barH, 3);
                             ?>
                             <div class="act-bar-wrap">
-                                <div style="flex:1;display:flex;align-items:flex-end;">
-                                    <div class="act-bar" style="height:<?= $barH ?>px;width:100%;"></div>
-                                </div>
                                 <div class="act-count"><?= $m['count'] ?></div>
+                                <div class="act-bar-track">
+                                    <div class="act-bar" style="height:<?= $barH ?>px;"></div>
+                                </div>
                                 <div class="act-label"><?= $m['label'] ?></div>
                             </div>
                             <?php endforeach; ?>
