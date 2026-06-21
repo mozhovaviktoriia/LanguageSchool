@@ -52,13 +52,21 @@ $scoredSubmissions = array_filter($allSubmissions, fn($s) => $s['score'] !== nul
 $totalSubmissions  = count($allSubmissions);
 $reviewedCount     = count($scoredSubmissions);
 $pendingCount      = count(array_filter($allSubmissions, fn($s) => $s['status'] === 'submitted'));
-$avgScore = $reviewedCount > 0
-    ? round(array_sum(array_column(array_values($scoredSubmissions), 'score')) / $reviewedCount, 1)
+
+/* Обраховувати середній бал як середній відсоток, а не середню абсолютну оцінку */
+$percentages = [];
+foreach ($scoredSubmissions as $s) {
+    if ($s['max_score'] > 0) {
+        $percentages[] = ($s['score'] / $s['max_score']) * 100;
+    }
+}
+$avgScore = count($percentages) > 0
+    ? round(array_sum($percentages) / count($percentages), 1)
     : null;
 
-/* Знайти макс бал серед переглянутих */
-$maxScoreAchieved = $reviewedCount > 0
-    ? max(array_column(array_values($scoredSubmissions), 'score'))
+/* Знайти макс відсоток серед переглянутих */
+$maxScoreAchieved = count($percentages) > 0
+    ? round(max($percentages), 0)
     : null;
 
 /* Підрахунок оцінок по курсах */
@@ -85,34 +93,39 @@ foreach ($allSubmissions as $s) {
     }
 }
 
-/* ── Відвідуваність уроків ── */
-$stmtAttend = $pdo->prepare("
-    SELECT
-        la.attended,
-        l.title  AS lesson_title,
-        l.scheduled_at,
-        c.title  AS course_title,
-        lang.code AS lang_code
-    FROM lesson_attendance la
-    JOIN lessons l  ON la.lesson_id  = l.id
-    JOIN courses c  ON l.course_id   = c.id
-    JOIN languages lang ON c.language_id = lang.id
-    WHERE la.student_id = :s
-    ORDER BY l.scheduled_at DESC
-    LIMIT 30
-");
-$stmtAttend->execute([':s' => $studentId]);
-$attendance = $stmtAttend->fetchAll(PDO::FETCH_ASSOC);
 
-$attendedCount = count(array_filter($attendance, fn($a) => $a['attended'] == true));
-$totalLessons  = count($attendance);
-$attendRate    = $totalLessons > 0 ? round($attendedCount / $totalLessons * 100) : 0;
 
 /* ── Кількість курсів ── */
 $stmtEnrolled = $pdo->prepare("SELECT COUNT(*) FROM enrollments WHERE student_id = :s AND status = 'active'");
 $stmtEnrolled->execute([':s' => $studentId]);
 $activeCoursesCount = (int)$stmtEnrolled->fetchColumn();
+/* ── Відвідуваність уроків ── */
+$stmtAttendance = $pdo->prepare("
+    SELECT
+        l.id,
+        l.title AS lesson_title,
+        l.scheduled_at,
+        l.status,
+        c.title AS course_title,
+        lang.code AS lang_code,
+        lang.name_ua AS lang_name
+    FROM lessons l
+    JOIN courses c ON l.course_id = c.id
+    JOIN languages lang ON c.language_id = lang.id
+    WHERE l.course_id IN (
+        SELECT course_id FROM enrollments WHERE student_id = :s AND status = 'active'
+    )
+    AND l.status IN ('completed', 'cancelled')
+    ORDER BY l.scheduled_at DESC
+    LIMIT 50
+");
+$stmtAttendance->execute([':s' => $studentId]);
+$attendanceLessons = $stmtAttendance->fetchAll(PDO::FETCH_ASSOC);
 
+$completedLessons = count(array_filter($attendanceLessons, fn($l) => $l['status'] === 'completed'));
+$canceledLessons = count(array_filter($attendanceLessons, fn($l) => $l['status'] === 'cancelled'));
+$totalLessons = count($attendanceLessons);
+$attendanceRate = $totalLessons > 0 ? round($completedLessons / $totalLessons * 100) : 0;
 /* Розподіл оцінок по шкалі (для графіку) */
 $gradeDistribution = ['A' => 0, 'B' => 0, 'C' => 0, 'D' => 0, 'F' => 0];
 foreach ($scoredSubmissions as $s) {
@@ -292,23 +305,20 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .act-count { font-family:var(--mono); font-size:8px; color:#a5b4fc; font-weight:700; }
 
 /* ── Attendance ── */
-.attend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
+.attend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; }
 .attend-item { display:flex; align-items:flex-start; gap:10px; padding:12px; background:var(--surface); border-radius:10px; border:1px solid var(--border); transition:.2s; }
 .attend-item:hover { border-color:rgba(99,102,241,.3); }
+.attend-item.status-completed { border-left:3px solid var(--green); }
+.attend-item.status-canceled { border-left:3px solid var(--red); }
 .attend-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; flex-shrink:0; }
 .attend-dot.present { background:var(--green); box-shadow:0 0 6px rgba(34,197,94,.5); }
 .attend-dot.absent  { background:var(--red);   box-shadow:0 0 6px rgba(239,68,68,.4); }
 .attend-lesson { font-size:11px; font-weight:700; margin-bottom:2px; }
 .attend-course { font-family:var(--mono); font-size:9px; color:var(--teal); margin-bottom:3px; }
 .attend-date   { font-family:var(--mono); font-size:9px; color:var(--muted); }
-
-/* ── Feedback card ── */
-.feedback-list { display:flex; flex-direction:column; gap:10px; }
-.feedback-item { padding:14px; background:var(--surface); border-radius:12px; border:1px solid var(--border); border-left:3px solid var(--accent); }
-.fb-task { font-size:12px; font-weight:700; margin-bottom:3px; }
-.fb-course { font-family:var(--mono); font-size:9px; color:var(--teal); margin-bottom:6px; }
-.fb-text { font-size:11px; color:var(--muted); line-height:1.6; font-style:italic; }
-.fb-score { font-family:var(--mono); font-size:10px; color:var(--green); margin-top:6px; font-weight:700; }
+.attend-status { display:flex; gap:4px; }
+.status-completed-badge { background:rgba(34,197,94,.1); color:var(--green); border:1px solid rgba(34,197,94,.2); }
+.status-canceled-badge { background:rgba(239,68,68,.1); color:var(--red); border:1px solid rgba(239,68,68,.2); }
 
 /* ── Attend rate ring ── */
 .attend-ring { display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px; }
@@ -317,6 +327,14 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
 .ring-fg  { fill:none; stroke:var(--teal); stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset .8s ease; }
 .ring-text { font-family:var(--mono); font-size:22px; font-weight:800; color:var(--teal); }
 .ring-label { font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+
+/* ── Feedback card ── */
+.feedback-list { display:flex; flex-direction:column; gap:10px; }
+.feedback-item { padding:14px; background:var(--surface); border-radius:12px; border:1px solid var(--border); border-left:3px solid var(--accent); }
+.fb-task { font-size:12px; font-weight:700; margin-bottom:3px; }
+.fb-course { font-family:var(--mono); font-size:9px; color:var(--teal); margin-bottom:6px; }
+.fb-text { font-size:11px; color:var(--muted); line-height:1.6; font-style:italic; }
+.fb-score { font-family:var(--mono); font-size:10px; color:var(--green); margin-top:6px; font-weight:700; }
 
 /* ── Empty state ── */
 .empty-state { display:flex; flex-direction:column; align-items:center; padding:40px 24px; gap:10px; text-align:center; }
@@ -451,10 +469,11 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
             </div>
             <div class="stat-card c-red">
                 <div class="stat-icon">📅</div>
-                <div class="stat-num"><?= $attendRate ?>%</div>
+                <div class="stat-num"><?= $attendanceRate ?>%</div>
                 <div class="stat-label">Відвідуваність</div>
-                <div class="stat-sub"><?= $attendedCount ?>/<?= $totalLessons ?> занять</div>
+                <div class="stat-sub"><?= $completedLessons ?>/<?= $totalLessons ?> занять</div>
             </div>
+
         </div>
 
         <!-- ── TAB: ОГЛЯД ── -->
@@ -542,7 +561,7 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
                         </div>
                         <?php
                         $circumference = 2 * M_PI * 40;
-                        $offset = $circumference - ($attendRate / 100) * $circumference;
+                        $offset = $circumference - ($attendanceRate / 100) * $circumference;
                         ?>
                         <div class="attend-ring">
                             <svg class="ring-svg" width="100" height="100" viewBox="0 0 100 100">
@@ -552,17 +571,17 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
                                     stroke-dashoffset="<?= $offset ?>"
                                     id="ringFg"/>
                             </svg>
-                            <div class="ring-text"><?= $attendRate ?>%</div>
+                            <div class="ring-text"><?= $attendanceRate ?>%</div>
                             <div class="ring-label">присутність</div>
                         </div>
                         <div style="display:flex;justify-content:space-around;margin-top:8px;">
                             <div style="text-align:center;">
-                                <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--green)"><?= $attendedCount ?></div>
-                                <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">присутній</div>
+                                <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--green)"><?= $completedLessons ?></div>
+                                <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">відвідані</div>
                             </div>
                             <div style="text-align:center;">
-                                <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:#fca5a5"><?= $totalLessons - $attendedCount ?></div>
-                                <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">відсутній</div>
+                                <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:#fca5a5"><?= $canceledLessons ?></div>
+                                <div style="font-family:var(--mono);font-size:9px;color:var(--muted)">скасовані</div>
                             </div>
                             <div style="text-align:center;">
                                 <div style="font-family:var(--mono);font-size:16px;font-weight:800;color:var(--muted)"><?= $totalLessons ?></div>
@@ -709,28 +728,36 @@ body::before { content:''; position:fixed; inset:0; background: radial-gradient(
         <div class="tab-panel" id="tab-attendance">
             <div class="card">
                 <div class="card-head">
-                    <div class="card-title">Журнал відвідуваності</div>
-                    <span class="card-sub">Останні <?= count($attendance) ?> занять</span>
+                    <div class="card-title">Журнал уроків</div>
+                    <span class="card-sub"><?= count($attendanceLessons) ?> уроків</span>
                 </div>
-                <?php if (empty($attendance)): ?>
+                <?php if (empty($attendanceLessons)): ?>
                     <div class="empty-state">
                         <div class="empty-icon">📅</div>
-                        <div class="empty-title">Немає даних про відвідуваність</div>
-                        <div class="empty-sub">Дані з'являться після проведення перших занять</div>
+                        <div class="empty-title">Немає даних про уроки</div>
+                        <div class="empty-sub">Дані з'являтися після завершення перших занять</div>
                     </div>
                 <?php else: ?>
                     <div class="attend-grid">
-                        <?php foreach ($attendance as $a):
-                            $dt = new DateTime($a['scheduled_at']);
+                        <?php foreach ($attendanceLessons as $l):
+                            $dt = new DateTime($l['scheduled_at']);
                             $flags = ['en'=>'🇬🇧','de'=>'🇩🇪','ja'=>'🇯🇵','fr'=>'🇫🇷'];
-                            $flag = $flags[$a['lang_code']] ?? '🌐';
+                            $flag = $flags[$l['lang_code']] ?? '🌐';
+                            $isCompleted = $l['status'] === 'completed';
                         ?>
-                        <div class="attend-item">
-                            <div class="attend-dot <?= $a['attended'] ? 'present' : 'absent' ?>"></div>
-                            <div>
-                                <div class="attend-lesson"><?= htmlspecialchars($a['lesson_title'] ?? '') ?></div>
-                                <div class="attend-course"><?= $flag ?> <?= htmlspecialchars($a['course_title'] ?? '') ?></div>
+                        <div class="attend-item <?= $isCompleted ? 'status-completed' : 'status-canceled' ?>">
+                            <div class="attend-dot <?= $isCompleted ? 'present' : 'absent' ?>"></div>
+                            <div style="flex:1;">
+                                <div class="attend-lesson"><?= htmlspecialchars($l['lesson_title'] ?? '') ?></div>
+                                <div class="attend-course"><?= $flag ?> <?= htmlspecialchars($l['course_title'] ?? '') ?></div>
                                 <div class="attend-date"><?= $dt->format('d.m.Y H:i') ?></div>
+                            </div>
+                            <div class="attend-status">
+                                <?php if ($isCompleted): ?>
+                                    <span class="status-badge status-completed-badge">✓ Завершено</span>
+                                <?php else: ?>
+                                    <span class="status-badge status-canceled-badge">✕ Скасовано</span>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
@@ -812,7 +839,7 @@ window.addEventListener('load', () => {
     const ring = document.getElementById('ringFg');
     if (ring) {
         const full = 2 * Math.PI * 40;
-        const rate = <?= $attendRate ?>;
+        const rate = <?= $attendanceRate ?>;
         ring.style.strokeDashoffset = full - (rate / 100) * full;
     }
 });

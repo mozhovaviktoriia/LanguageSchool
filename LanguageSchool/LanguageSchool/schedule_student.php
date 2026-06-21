@@ -41,7 +41,7 @@ $rangeEnd   = $view === 'week' ? $weekEnd   : $monthEndStr;
 /* ── Lessons ── */
 $stmtLessons = $pdo->prepare("
     SELECT
-        l.id, l.title, l.scheduled_at, l.lesson_type, l.meeting_url,
+        l.id, l.title, l.scheduled_at, l.lesson_type, l.meeting_url, l.status,
         c.title      AS course_title,
         c.id         AS course_id,
         lang.code    AS lang_code,
@@ -157,7 +157,7 @@ function lessonJson(array $l, array $colorMap): string {
         'end'     => $end->format('H:i'),
         'date'    => $dt->format('d.m.Y'),
         'dur'     => $dur,
-        'status'  => 'scheduled',
+        'status'  => $l['status'] ?? 'scheduled',
         'url'     => $l['meeting_url'] ?? '',
         'color'   => $colorMap[$l['course_id']] ?? '#6366f1',
         'lang'    => $l['lang_name'],
